@@ -1,1 +1,1 @@
-# SegNet- tensotflow implementation
+# SegNet- tensorflow implementation
