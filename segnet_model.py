@@ -100,7 +100,7 @@ def max_pool(inputs,name):
     print('value shape',value.shape)
     print('index shape',index.shape)
     
-    return value,index,inputs.get_shape().as_list()
+    return tf.to_float(value),index,inputs.get_shape().as_list()
 #here value is the max value, index is the corresponding index, the detail information is here https://www.tensorflow.org/versions/r1.0/api_docs/python/tf/nn/max_pool_with_argmax
     
 def conv_layer(bottom, name, training_state):
@@ -153,7 +153,7 @@ def unravel_index(indices, shape):
     output: It's the 4D maxpooling indices!
     """
     
-def up_sampling(value,indices,shape):
+def up_sampling(max_values,max_indices,shape):
     """
     Inputs:
     max_value: the maximum value from maxpooling function, value need to be a tensor. The most important thing for
@@ -254,7 +254,7 @@ def weighted_loss(logits,labels,number_class, frequency):
     Accuracy
     """
     label_flatten = tf.reshape(labels,[-1,1])
-    label_onehot = tf.reshape(tf.onehot(label_flatten,depth=number_class),[-1,number_class])
+    label_onehot = tf.reshape(tf.one_hot(label_flatten,depth=number_class),[-1,number_class])
     cross_entropy = -tf.reduce_sum(tf.multiply((label_onehot*tf.log(logits+1e-10)),frequency),reduction_indices=[1])
     loss = tf.reduce_mean(cross_entropy,name = "cross entropy")
     argmax_logit = tf.to_int32(tf.argmax(logits,axis= -1))
