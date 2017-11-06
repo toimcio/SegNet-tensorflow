@@ -144,10 +144,10 @@ def get_bias(name):
 
 def unravel_index(indices, shape):
     with tf.name_scope('unravel_index'):
-        indices = tf.expand_dims(indices, 0)
-        shape = tf.expand_dims(shape, 1)
-        strides = tf.cumprod(shape, reverse=True)
-        strides_shifted = tf.cumprod(shape, exclusive=True, reverse=True)
+        indices = tf.to_int64(tf.expand_dims(indices, 0))
+        shape = tf.to_int64(tf.expand_dims(shape, 1))
+        strides = tf.to_int64(tf.cumprod(shape, reverse=True))
+        strides_shifted = tf.to_int64(tf.cumprod(shape, exclusive=True, reverse=True))
         return (indices % strides) // strides_shifted
     #This function is utilized to transform the flattened maxpooling index to the original 4D tensor, and have already test
     #it, which works brilliant!
@@ -160,29 +160,24 @@ def unravel_index(indices, shape):
 def up_sampling(value,indices,shape):
     """
     Inputs:
-    value: the maximum value from maxpooling function, value need to be a tensor. The most important thing for
+    max_value: the maximum value from maxpooling function, value need to be a tensor. The most important thing for
     value is that it needs to be reshaped to be only one column! 
-    indices: the flattened position for the maximum value from maxpooling function. Also indices need to be reshaped
+    max_indices: the flattened position for the maximum value from maxpooling function. Also indices need to be reshaped
     to be two dimension. [Num_tot_values,4]. 4 is because we have 4 dimension
     shape: the shape of the original data, [batch_size,height,width,Num_of_Channels]
     Outputs:
-    up_sample_sp: The sparse matrix from the up_sampling.
+    sp_dense: The sparse matrix from the up_sampling.
     """
-    mx_sh = value.shape
-    tot = mx_sh[0].value*mx_sh[1].value*mx_sh[2].value*mx_sh[3].value
-    value_reshape = tf.reshape(value,[tot])
-    index_reshape = tf.reshape(indices,[1,tot])
-    print('The shape of reshaped maxvalue',value_reshape.shape)
-    print('The shape of reshaped maxindex',index_reshape.shape)
-    pooling_index_4d = tf.to_int64(unravel_index(index_reshape,shape),name='ToInt64')
+    values_reshape = tf.reshape(max_values,[-1])
+    indices_reshape = tf.reshape(max_indices,[-1])
+    print('The shape of reshaped maxindex',indices_reshape.shape)
+    pooling_index_4d = tf.stack(tf.unstack(unravel_index(indices_reshape,shape), axis=0), axis=1)
     print('The shape of 4d indices', pooling_index_4d.shape)
-    sp_tensor = tf.SparseTensor(tf.reshape(pooling_index_4d,
-                                           [pooling_index_4d.shape[2].value,
-                                            pooling_index_4d.shape[1].value]),
-                                            values = value_reshape, dense_shape = shape)
-    sp_dense = tf.sparse_tensor_to_dense(sp_tensor)
+    sp_tensor = tf.SparseTensor(pooling_index_4d, values = values_reshape, dense_shape = shape)
+    sp_dense = tf.sparse_tensor_to_dense(sp_tensor, validate_indices=False)
     print('The shape of sparse matrix', sp_dense.shape)
-    return sp_dense
+    return sp_dense 
+    
 
 
 def _initialization(k,c):
@@ -266,8 +261,8 @@ def weighted_loss(logits,labels,number_class, frequency):
     label_onehot = tf.reshape(tf.onehot(label_flatten,depth=number_class),[-1,number_class])
     cross_entropy = -tf.reduce_sum(tf.multiply((label_onehot*tf.log(logits+1e-10)),frequency),reduction_indices=[1])
     loss = tf.reduce_mean(cross_entropy,name = "cross entropy")
-    argmax_logit = tf.to_int32(tf.argmax(logits,axis=1))
-    argmax_label = tf.to_int32(tf.argmax(label_onehot,axis=1))
+    argmax_logit = tf.to_int32(tf.argmax(logits,axis= -1))
+    argmax_label = tf.to_int32(tf.argmax(label_onehot,axis= -1))
     correct = tf.to_float(tf.equal(argmax_logit,argmax_label))
     accuracy = tf.reduce_mean(correct)
     return loss, accuracy, argmax_logit 
