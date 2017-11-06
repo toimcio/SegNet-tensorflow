@@ -67,18 +67,18 @@ def inference(images, labels, batch_size, training_state):
     deconv2_1 = up_sampling(deconv1_4,pool4_index,shape = shape_4)
     deconv2_2 = deconv_layer(deconv2_1,[3,3,512,512],shape_4,"deconv2_2",training_state)
     deconv2_3 = deconv_layer(deconv2_2,[3,3,512,512],shape_4,"deconv2_3",training_state)
-    deconv2_4 = deconv_layer(deconv2_3,[3,3,256,512],[5,45,60,256],"deconv2_4",training_state)
+    deconv2_4 = deconv_layer(deconv2_3,[3,3,256,512],[shape_4[0],shape_4[1],shape_4[2],256],"deconv2_4",training_state)
     
     #Third box of deconvolution layers(9)
     deconv3_1 = up_sampling(deconv2_4,pool3_index,shape = shape_3)
     deconv3_2 = deconv_layer(deconv3_1,[3,3,256,256],shape_3,"deconv3_2",training_state)
     deconv3_3 = deconv_layer(deconv3_2,[3,3,256,256],shape_3,"deconv3_3",training_state)
-    deconv3_4 = deconv_layer(deconv3_3,[3,3,128,256],[5,90,120,128],"deconv3_4",training_state)
+    deconv3_4 = deconv_layer(deconv3_3,[3,3,128,256],[shape_3[0],shape_3[1],shape_3[2],128],"deconv3_4",training_state)
     
     #Fourth box of deconvolution layers(11)
     deconv4_1 = up_sampling(deconv3_4,pool2_index,shape = shape_2)
     deconv4_2 = deconv_layer(deconv4_1,[3,3,128,128],shape_2,"deconv4_2",training_state)
-    deconv4_3 = deconv_layer(deconv4_2,[3,3,64,128],[5,180,240,64],"deconv4_3",training_state)
+    deconv4_3 = deconv_layer(deconv4_2,[3,3,64,128],[shape_2[0],shape_2[1],shape_2[2],64],"deconv4_3",training_state)
     
     #Fifth box of deconvolution layers(13)
     deconv5_1 = up_sampling(deconv4_3,pool1_index,shape = shape_1)
@@ -253,13 +253,15 @@ def weighted_loss(logits,labels,number_class, frequency):
     Loss
     Accuracy
     """
-    label_flatten = tf.reshape(labels,[-1,1])
-    label_onehot = tf.reshape(tf.one_hot(label_flatten,depth=number_class),[-1,number_class])
-    cross_entropy = -tf.reduce_sum(tf.multiply((label_onehot*tf.log(logits+1e-10)),frequency),reduction_indices=[1])
-    loss = tf.reduce_mean(cross_entropy,name = "cross entropy")
+    label_flatten = tf.reshape(labels,[-1])
+    label_onehot = tf.reshape(tf.one_hot(label_flatten,depth=number_class),[-1,11])
+    print(label_flatten)
+    print(label_onehot)
+    cross_entropy = -tf.reduce_sum(tf.multiply((label_onehot*tf.log(tf.reshape(logits,[-1,11])+1e-10)),frequency),reduction_indices=[1])
+    loss = tf.reduce_mean(cross_entropy,name = "cross_entropy")
     argmax_logit = tf.to_int32(tf.argmax(logits,axis= -1))
     argmax_label = tf.to_int32(tf.argmax(label_onehot,axis= -1))
-    correct = tf.to_float(tf.equal(argmax_logit,argmax_label))
+    correct = tf.to_float(tf.equal(tf.reshape(argmax_logit,[-1]),tf.reshape(argmax_label,[-1])))
     accuracy = tf.reduce_mean(correct)
     return loss, accuracy, argmax_logit 
 
@@ -277,6 +279,7 @@ def train_op(total_loss,global_step):
     Learning_Rate = 0.1
     MOVING_AVERAGE_DECAY = 0.999
     optimizer = tf.train.AdamOptimizer(learning_rate = Learning_Rate)
+    print(total_loss)
     grads_and_vars = optimizer.compute_gradients(total_loss)
     apply_grad_op = optimizer.apply_gradients(grads_and_vars)
     
@@ -299,7 +302,7 @@ def train_op(total_loss,global_step):
     #one by one, it's much easier to call them by trainable_variables, since we have already define the training_phase in our
     #layers.
     with tf.control_dependencies([apply_grad_op]):
-        train_op = variable_averages.apply(tf.trainable_varialbes())
+        train_op = variable_averages.apply(tf.trainable_variables())
         
     return train_op
 
@@ -356,24 +359,29 @@ def TRAINING():
     """
     As before, FLAGS including all the necessary information!
     """
-    max_steps = 1
+    max_steps = 101
     batch_size = 5
-    train_dir = "../SegNet/CamVid/train.txt"
-    image_dir = "../SegNet/CamVid/test.txt"
+    train_dir = "./"
+    image_dir = "../SegNet/CamVid/train.txt"
     val_dir = "../SegNet/CamVid/val.txt"
     image_w = 360
     image_h = 480
     image_c = 3
     
     image_filename,label_filename = get_filename_list(image_dir)
+    image_filename = [".." + n for n in image_filename]
+    label_filename = [".." + n for n in label_filename]
+
     val_image_filename, val_label_filename = get_filename_list(val_dir)
+    val_image_filename = [".." + n for n in val_image_filename]
+    val_label_filename = [".." + n for n in val_label_filename]
     
     with tf.Graph().as_default():
         
         train_data_tensor = tf.placeholder(tf.float32, [batch_size, image_w, image_h, image_c])
         train_label_tensor = tf.placeholder(tf.int64, [batch_size, image_w, image_h, 1])
-        val_data_tensor = tf.placeholder(tf.float32, [batch_size, image_w, image_h, image_c])
-        val_label_tensor = tf.placeholder(tf.int64, [batch_size, image_w, image_h, 1])
+        #val_data_tensor = tf.placeholder(tf.float32, [batch_size, image_w, image_h, image_c])
+        #val_label_tensor = tf.placeholder(tf.int64, [batch_size, image_w, image_h, 1])
         
         phase_train = tf.placeholder(tf.bool, name = "phase_train")
         global_step = tf.Variable(0, trainable = False)
@@ -383,26 +391,28 @@ def TRAINING():
         
         
         loss, accuracy, logits, prediction = inference(train_data_tensor, train_label_tensor, batch_size, phase_train)
-        train_op = train_op(loss, global_step)
+        train = train_op(loss, global_step)
         
         saver = tf.train.Saver(tf.global_variables())
         
         summary_op = tf.summary.merge_all()
         #Merges all summaries collected in the default graph.
         
-        with tf.Session() as sess:
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        with tf.Session(config=config) as sess:
             init = tf.global_variables_initializer()
             sess.run(init)
             
           
         #The queue runners basic reference: https://www.tensorflow.org/versions/r0.12/how_tos/threading_and_queues/
         #This is utilized to make sure that each image only use once?
-            #coord = tf.train.Coordinator()
-            #threads = tf.train.start_queue_runners(sess = sess, coord = coord)
+            coord = tf.train.Coordinator()
+            threads = tf.train.start_queue_runners(sess = sess, coord = coord)
         
             
             train_loss, train_accuracy = [],[]
-            val_loss, val_accuracy = [],[]
+            val_loss, val_acc = [],[]
             
         
             for step in range(max_steps):
@@ -414,7 +424,7 @@ def TRAINING():
                             train_label_tensor: label_batch,
                             phase_train: True}
             
-                _, _loss, _accuracy = sess.run([train_op, loss, accuracy], feed_dict = feed_dict)
+                _, _loss, _accuracy = sess.run([train, loss, accuracy], feed_dict = feed_dict)
                 
                 _train_loss.append(_loss)
                 _train_accuracy.append(_accuracy)
@@ -423,24 +433,24 @@ def TRAINING():
                     train_accuracy.append(np.mean(_train_accuracy))
                     
                     pred = sess.run(prediction, feed_dict = feed_dict)
-                    per_class_acc(pred, label_batch) 
+                    #per_class_acc(pred, label_batch) 
                     #per_class_acc is a function from utils 
                     
-                if step % 100 == 0:
+                if step % 10 == 0:
                     print("start validating.......")
                     
-                    for test_step in range(int(TEST_ITER)):
+                    for test_step in range(int(4)):
                         _val_loss = []
                         _val_acc = []
                         fetches_valid = [loss, accuracy]
                         image_batch_val, label_batch_val = sess.run([images_val, labels_val])
-                        feed_dict_valid = {val_data_tensor: image_batch_val,
-                                          val_label_tensor: label_batch_val,
+                        feed_dict_valid = {train_data_tensor: image_batch_val,
+                                          train_label_tensor: label_batch_val,
                                           phase_train:True}
                         _loss, _acc = sess.run(fetches_valid, feed_dict_valid)
                         
-                        _val_loss.append(_val_loss)
-                        _val_acc.append(_val_acc)
+                        _val_loss.append(_loss)
+                        _val_acc.append(_acc)
                         
                     val_loss.append(np.mean(_val_loss))
                     val_acc.append(np.mean(_val_acc))
@@ -452,50 +462,7 @@ def TRAINING():
                     checkpoint_path = os.path.join(train_dir,'model.ckpt')
                     saver.save(sess,checkpoint_path,global_step = step)
                     
-            #coord.request_stop()
-            #coord.join(threads)
+            coord.request_stop()
+            coord.join(threads)
             
-                    
-                
-                    
-                    
-                        
-                     
-                        
-                    
-
-                
-                
-            
-            
-        
-    
-        
-
-
-
-        
-    
-
-
-
-
-
-
-    
-    
-    
-
-
-
-
-        
-    
-
-    
-    
-    
-    
-
-
-
+              
