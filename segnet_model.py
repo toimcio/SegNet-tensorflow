@@ -96,12 +96,11 @@ def avg_pool(bottom, name):
     return tf.nn.avg_pool(bottom, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=name)
 
 def max_pool(inputs,name):
-    value,index = tf.nn.max_pool_with_argmax(inputs,ksize=[1,2,2,1],strides=[1,2,2,1],padding='SAME',name=name,
-                                            Targmax = tf.int32)
-    sh_temp = inputs.shape
-    shape_inputs = [sh_temp[0].value,sh_temp[1].value,sh_temp[2].value,sh_temp[3].value]                       
+    value,index = tf.nn.max_pool_with_argmax(tf.to_double(inputs),ksize=[1,2,2,1],strides=[1,2,2,1],padding='SAME',name=name)
     print('value shape',value.shape)
     print('index shape',index.shape)
+    
+    return value,index
                            
     
     return value,index,shape_inputs
@@ -126,7 +125,7 @@ def batch_norm(bias_input, is_training, scope):
                                                       scope = scope+"_bn")
     else:
         return tf.contrib.layers.batch_norm(bias_input,is_training = False,center = False,
-                                                      scope = scope+"_bn", reuse = True)
+                                                      scope = scope+"_bn")#, reuse = True)
 #is_training = Ture, it will accumulate the statistics of the movements into moving_mean and moving_variance. When it's 
 #not in a training mode, then it would use the values of the moving_mean, and moving_variance. Which is exactly what we want,
 #since when it's not training, we are not allowed to use the actual mean and variance for the validation data. 
