@@ -122,11 +122,12 @@ def batch_norm(bias_input, is_training, scope):
                                                       scope = scope+"_bn")
     else:
         return tf.contrib.layers.batch_norm(bias_input,is_training = False,center = False,
-                                                      scope = scope+"_bn")#, reuse = True)
+                                                      scope = scope+"_bn", reuse = True)
 #is_training = Ture, it will accumulate the statistics of the movements into moving_mean and moving_variance. When it's 
-#not in a training mode, then it would use the values of the moving_mean, and moving_variance. Which is exactly what we want,
-#since when it's not training, we are not allowed to use the actual mean and variance for the validation data. 
-#reuse is that if we will reuse the layers, which I really don't understand what does that mean
+#not in a training mode, then it would use the values of the moving_mean, and moving_variance. 
+#shadow_variable = decay * shadow_variable + (1 - decay) * variable, shadow_variable, I think it's the accumulated moving
+#average, and then variable is the average for this specific batch of data. For the training part, we need to set is_training
+#to be True, but for the validation part, actually we should set it to be False!
 
 def get_conv_filter(name):
     return tf.constant(vgg_param_dict[name][0], name="filter")
