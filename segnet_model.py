@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 import time
 import math
-
+from Inputs import *
 
 
 def vgg_param_load(vgg16_npy_path): 
@@ -13,10 +13,11 @@ def vgg_param_load(vgg16_npy_path):
     for key in vgg_param_dict:
         print(key,vgg_param_dict[key][0].shape,vgg_param_dict[key][1].shape)
     print("vgg parameter loaded")
+    return vgg_param_dict
     
-   
+vgg_param_dict = vgg_param_load("vgg16.npy")   
                
-def inference(images, labels, batch_size, phase_train):
+def inference(images, labels, batch_size, training_state):
     """
     images: is the input images, Training data also Test data
     labels: corresponding labels for images
@@ -360,19 +361,18 @@ def test(FLAGS):
         #np.nanmean ignore the nan value, calculat the mean along the specific axis
         
         
-def TRAINING(FLAGS):
+def TRAINING():
     """
     As before, FLAGS including all the necessary information!
     """
-    max_steps = FLAGS.max_steps #1000
-    batch_size = FLAGS.batch_size #batch_size = 5
-    train_dir = FLAGS.train_dir #/Users/boli/Documents/python/project/SegNet/
-    image_dir = FLAGS.image_dir #/Users/boli/Documents/python/project/SegNet/
-    val_dir = FLAGS.val_dir #/Users/boli/Documents/python/projects/SegNet/
-    finetune_ckpt = FLAGS.finetune
-    image_w = FLAGS.image_w
-    image_h = FLAGS.image_h
-    image_c = FLAGS.image_c
+    max_steps = 1
+    batch_size = 5
+    train_dir = "../SegNet/CamVid/train.txt"
+    image_dir = "../SegNet/CamVid/test.txt"
+    val_dir = "../SegNet/CamVid/val.txt"
+    image_w = 360
+    image_h = 480
+    image_c = 3
     
     image_filename,label_filename = get_filename_list(image_dir)
     val_image_filename, val_label_filename = get_filename_list(val_dir)
@@ -380,7 +380,7 @@ def TRAINING(FLAGS):
     with tf.Graph().as_default():
         
         train_data_tensor = tf.placeholder(tf.float32, [batch_size, image_w, image_h, image_c])
-        train_label_tensor = tf.placeholder(tf.int64, [batch_size, iamge_w, image_h, 1])
+        train_label_tensor = tf.placeholder(tf.int64, [batch_size, image_w, image_h, 1])
         val_data_tensor = tf.placeholder(tf.float32, [batch_size, image_w, image_h, image_c])
         val_label_tensor = tf.placeholder(tf.int64, [batch_size, image_w, image_h, 1])
         
@@ -406,8 +406,8 @@ def TRAINING(FLAGS):
           
         #The queue runners basic reference: https://www.tensorflow.org/versions/r0.12/how_tos/threading_and_queues/
         #This is utilized to make sure that each image only use once?
-            coord = tf.train.Coordinator()
-            threads = tf.train.start_queue_runners(sess = sess, coord = coord)
+            #coord = tf.train.Coordinator()
+            #threads = tf.train.start_queue_runners(sess = sess, coord = coord)
         
             
             train_loss, train_accuracy = [],[]
@@ -461,8 +461,8 @@ def TRAINING(FLAGS):
                     checkpoint_path = os.path.join(train_dir,'model.ckpt')
                     saver.save(sess,checkpoint_path,global_step = step)
                     
-            coord.request_stop()
-            coord.join(threads)
+            #coord.request_stop()
+            #coord.join(threads)
             
                     
                 
