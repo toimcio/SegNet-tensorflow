@@ -100,10 +100,7 @@ def max_pool(inputs,name):
     print('value shape',value.shape)
     print('index shape',index.shape)
     
-    return value,index
-                           
-    
-    return value,index,shape_inputs
+    return value,index,inputs.get_shape().as_list()
 #here value is the max value, index is the corresponding index, the detail information is here https://www.tensorflow.org/versions/r1.0/api_docs/python/tf/nn/max_pool_with_argmax
     
 def conv_layer(bottom, name, training_state):
