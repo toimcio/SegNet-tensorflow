@@ -8,6 +8,8 @@ import math
 from Inputs import *
 
 
+
+vgg16_npy_path = "/zhome/1c/2/114196/Documents/SegNet-tensorflow/vgg16.npy"
 def vgg_param_load(vgg16_npy_path): 
     vgg_param_dict = np.load(vgg16_npy_path,encoding='latin1').item()
     for key in vgg_param_dict:
@@ -15,7 +17,7 @@ def vgg_param_load(vgg16_npy_path):
     print("vgg parameter loaded")
     return vgg_param_dict
     
-vgg_param_dict = vgg_param_load("vgg16.npy")   
+vgg_param_dict = vgg_param_load(vgg16_npy_path)   
                
 def inference(images, labels, batch_size, training_state):
     """
@@ -26,31 +28,31 @@ def inference(images, labels, batch_size, training_state):
     """
     
     #first box of convolution layer,each part we do convolution two times, so we have conv1_1, and conv1_2
-    conv1_1 = conv_layer(images, "conv1_1",training_state)
-    conv1_2 = conv_layer(conv1_1, "conv1_2",training_state)
+    conv1_1 = conv_layer(images, "conv1_1", [3,3,3,64], training_state)
+    conv1_2 = conv_layer(conv1_1, "conv1_2", [3,3,64,64], training_state)
     pool1,pool1_index,shape_1 = max_pool(conv1_2, 'pool1')
     
     #Second box of covolution layer(4)
-    conv2_1 = conv_layer(pool1, "conv2_1",training_state)
-    conv2_2 = conv_layer(conv2_1, "conv2_2",training_state)
+    conv2_1 = conv_layer(pool1, "conv2_1", [3,3,64,128], training_state)
+    conv2_2 = conv_layer(conv2_1, "conv2_2",[3,3,128,128], training_state)
     pool2,pool2_index,shape_2 = max_pool(conv2_2, 'pool2')
     
     #Third box of covolution layer(7)
-    conv3_1 = conv_layer(pool2, "conv3_1",training_state)
-    conv3_2 = conv_layer(conv3_1, "conv3_2",training_state)
-    conv3_3 = conv_layer(conv3_2, "conv3_3",training_state)
+    conv3_1 = conv_layer(pool2, "conv3_1", [3,3,128,256], training_state)
+    conv3_2 = conv_layer(conv3_1, "conv3_2",[3,3,256,256], training_state)
+    conv3_3 = conv_layer(conv3_2, "conv3_3", [3,3,256,256],training_state)
     pool3,pool3_index,shape_3 = max_pool(conv3_3, 'pool3')
     
     #Fourth box of covolution layer(10)
-    conv4_1 = conv_layer(pool3, "conv4_1",training_state)
-    conv4_2 = conv_layer(conv4_1, "conv4_2",training_state)
-    conv4_3 = conv_layer(conv4_2, "conv4_3",training_state)
+    conv4_1 = conv_layer(pool3, "conv4_1", [3,3,256,512], training_state)
+    conv4_2 = conv_layer(conv4_1, "conv4_2", [3,3,512,512], training_state)
+    conv4_3 = conv_layer(conv4_2, "conv4_3", [3,3,512,512], training_state)
     pool4,pool4_index,shape_4 = max_pool(conv4_3, 'pool4')
 
     #Fifth box of covolution layers(13)
-    conv5_1 = conv_layer(pool4, "conv5_1",training_state)
-    conv5_2 = conv_layer(conv5_1, "conv5_2",training_state)
-    conv5_3 = conv_layer(conv5_2, "conv5_3",training_state)
+    conv5_1 = conv_layer(pool4, "conv5_1", [3,3,512,512], training_state)
+    conv5_2 = conv_layer(conv5_1, "conv5_2",[3,3,512,512], training_state)
+    conv5_3 = conv_layer(conv5_2, "conv5_3",[3,3,512,512], training_state)
     pool5, pool5_index,shape_5 = max_pool(conv5_3, 'pool5')
         
         
@@ -59,32 +61,40 @@ def inference(images, labels, batch_size, training_state):
     
     #First box of decovolution layers(3)
     deconv1_1 = up_sampling(pool5, pool5_index,shape=shape_5)
-    deconv1_2 = deconv_layer(deconv1_1,[3,3,512,512],shape_5,"deconv1_2",training_state)
-    deconv1_3 = deconv_layer(deconv1_2,[3,3,512,512],shape_5,"deconv1_3",training_state)
-    deconv1_4 = deconv_layer(deconv1_3,[3,3,512,512],shape_5,"deconv1_4",training_state)
-    
+    #deconv1_2 = deconv_layer(deconv1_1,[3,3,512,512],shape_5,"deconv1_2",training_state)
+    #deconv1_3 = deconv_layer(deconv1_2,[3,3,512,512],shape_5,"deconv1_3",training_state)
+    #deconv1_4 = deconv_layer(deconv1_3,[3,3,512,512],shape_5,"deconv1_4",training_state)
+    deconv1_2 = conv_layer(deconv1_1,"deconv1_2",[3,3,512,512], training_state)
+    deconv1_3 = conv_layer(deconv1_2,"deconv1_3",[3,3,512,512], training_state)
+    deconv1_4 = conv_layer(deconv1_3,"deconv1_4",[3,3,512,512], training_state)
     #Second box of deconvolution layers(6)
     deconv2_1 = up_sampling(deconv1_4,pool4_index,shape = shape_4)
-    deconv2_2 = deconv_layer(deconv2_1,[3,3,512,512],shape_4,"deconv2_2",training_state)
-    deconv2_3 = deconv_layer(deconv2_2,[3,3,512,512],shape_4,"deconv2_3",training_state)
-    deconv2_4 = deconv_layer(deconv2_3,[3,3,256,512],[shape_4[0],shape_4[1],shape_4[2],256],"deconv2_4",training_state)
-    
+    #deconv2_2 = deconv_layer(deconv2_1,[3,3,512,512],shape_4,"deconv2_2",training_state)
+    #deconv2_3 = deconv_layer(deconv2_2,[3,3,512,512],shape_4,"deconv2_3",training_state)
+    #deconv2_4 = deconv_layer(deconv2_3,[3,3,256,512],[shape_4[0],shape_4[1],shape_4[2],256],"deconv2_4",training_state)
+    deconv2_2 = conv_layer(deconv2_1,"deconv2_2", [3,3,512,512], training_state)
+    deconv2_3 = conv_layer(deconv2_2, "deconv2_3", [3,3,512,512], training_state)
+    deconv2_4 = conv_layer(deconv2_3, "deconv2_4", [3,3,512,256], training_state)
     #Third box of deconvolution layers(9)
     deconv3_1 = up_sampling(deconv2_4,pool3_index,shape = shape_3)
-    deconv3_2 = deconv_layer(deconv3_1,[3,3,256,256],shape_3,"deconv3_2",training_state)
-    deconv3_3 = deconv_layer(deconv3_2,[3,3,256,256],shape_3,"deconv3_3",training_state)
-    deconv3_4 = deconv_layer(deconv3_3,[3,3,128,256],[shape_3[0],shape_3[1],shape_3[2],128],"deconv3_4",training_state)
-    
+    #deconv3_2 = deconv_layer(deconv3_1,[3,3,256,256],shape_3,"deconv3_2",training_state)
+    #deconv3_3 = deconv_layer(deconv3_2,[3,3,256,256],shape_3,"deconv3_3",training_state)
+    #deconv3_4 = deconv_layer(deconv3_3,[3,3,128,256],[shape_3[0],shape_3[1],shape_3[2],128],"deconv3_4",training_state)
+    deconv3_2 = conv_layer(deconv3_1,"deconv3_2", [3,3,256,256], training_state)
+    deconv3_3 = conv_layer(deconv3_2,"deconv3_3", [3,3,256,256], training_state)
+    deconv3_4 = conv_layer(deconv3_3, "deconv3_4", [3,3,256,128], training_state)
     #Fourth box of deconvolution layers(11)
     deconv4_1 = up_sampling(deconv3_4,pool2_index,shape = shape_2)
-    deconv4_2 = deconv_layer(deconv4_1,[3,3,128,128],shape_2,"deconv4_2",training_state)
-    deconv4_3 = deconv_layer(deconv4_2,[3,3,64,128],[shape_2[0],shape_2[1],shape_2[2],64],"deconv4_3",training_state)
-    
+    #deconv4_2 = deconv_layer(deconv4_1,[3,3,128,128],shape_2,"deconv4_2",training_state)
+    #deconv4_3 = deconv_layer(deconv4_2,[3,3,64,128],[shape_2[0],shape_2[1],shape_2[2],64],"deconv4_3",training_state)
+    deconv4_2 = conv_layer(deconv4_1, "deconv4_2", [3,3,128,128], training_state)
+    deconv4_3 = conv_layer(deconv4_2, "deconv4_3", [3,3,128,64], training_state)
     #Fifth box of deconvolution layers(13)
     deconv5_1 = up_sampling(deconv4_3,pool1_index,shape = shape_1)
-    deconv5_2 = deconv_layer(deconv5_1,[3,3,64,64],shape_1,"deconv5_2",training_state)
-    deconv5_3 = deconv_layer(deconv5_2,[3,3,11,64],[shape_1[0],shape_1[1],shape_1[2],11],"deconv5_3",training_state)
-    
+    #deconv5_2 = deconv_layer(deconv5_1,[3,3,64,64],shape_1,"deconv5_2",training_state)
+    #deconv5_3 = deconv_layer(deconv5_2,[3,3,11,64],[shape_1[0],shape_1[1],shape_1[2],11],"deconv5_3",training_state)
+    deconv5_2 = conv_layer(deconv5_1, "deconv5_2", [3,3,64,64], training_state)
+    deconv5_3 = conv_layer(deconv5_2, "deconv5_3", [3,3,64,11], training_state)
     prob = tf.nn.softmax(deconv5_3,name = "prob")
     
     loss, accuracy, logits, prediction = cal_loss(prob,labels)
@@ -103,12 +113,25 @@ def max_pool(inputs,name):
     return tf.to_float(value),index,inputs.get_shape().as_list()
 #here value is the max value, index is the corresponding index, the detail information is here https://www.tensorflow.org/versions/r1.0/api_docs/python/tf/nn/max_pool_with_argmax
     
-def conv_layer(bottom, name, training_state):
+def conv_layer(bottom, name, shape, training_state):
+    """
+    Inputs:
+    bottom: The input image or tensor
+    name: corresponding layer's name
+    shape: the shape of kernel size
+    training_state: represent if the weight should update 
+    Output:
+    The output from layers
+    """
+    kernel_size = shape[0]
+    input_channel = shape[2]
+    out_channel = shape[3]
     with tf.variable_scope(name):
-        
-        filt = get_conv_filter(name)
+        #filt = get_conv_filter(name)
+        filt = _variable_with_weight_decay('weights',shape = shape, initializer = _initialization(kernel_size,input_channel), wd = False)
         conv = tf.nn.conv2d(bottom, filt, [1, 1, 1, 1], padding='SAME')
-        conv_biases = get_bias(name)
+        #conv_biases = get_bias(name)
+        conv_biases = tf.get_variable(name+"bias",shape = out_channel, initializer = tf.constant_initializer(0.1))
         bias = tf.nn.bias_add(conv, conv_biases)
         out = batch_norm(bias,training_state,name)
             
@@ -122,7 +145,7 @@ def batch_norm(bias_input, is_training, scope):
                                                       scope = scope+"_bn")
     else:
         return tf.contrib.layers.batch_norm(bias_input,is_training = False,center = False,
-                                                      scope = scope+"_bn", reuse = True)
+                                                      scope = scope+"_bn", reuse = False)
 #is_training = Ture, it will accumulate the statistics of the movements into moving_mean and moving_variance. When it's 
 #not in a training mode, then it would use the values of the moving_mean, and moving_variance. 
 #shadow_variable = decay * shadow_variable + (1 - decay) * variable, shadow_variable, I think it's the accumulated moving
@@ -214,7 +237,36 @@ def deconv_layer(inputs,kernel_size,output_shape,name,training_state):
         print(relu)
         return relu
     
+def _variable_on_cpu(name,shape,initializer):
+    """
+    Help to create a variable which can be stored on CPU memory
+    Inputs: 
+    name: corresponding layers name, conv1 or ...
+    shape: the shape of the weight or bias
+    initializer: The initializer from _ínitialization
+    Outputs:
+    Variable tensor
+    """
+    with tf.device('/cpu:0'):
+        var = tf.get_variable(name,shape,initializer = initializer)
+    return var 
+
+def _variable_with_weight_decay(name,shape,initializer,wd):
+    """
+    Help to create an initialized variable with weight decay
+    The variable is initialized with a truncated normal distribution, only the value for standard deviation is determined
+    by the specific function _initialization
+    Inputs: wd is utilized to noticify if weight decay is utilized 
+    Return: varialbe tensor
+    """
+    var = _variable_on_cpu(name,shape,initializer)
+    if wd is True:
+        weight_decay = tf.multiply(tf.nn.l2_loss(var),wd,name='weight_loss')
+        tf.add_to_collection('losses',weight_decay)
+    #tf.nn.l2_loss is utilized to compute half L2 norm of a tensor without the sqrt output = sum(t**2)/2    
+    return var
     
+
     
 def cal_loss(logits,labels):
     loss_weight = np.array([
@@ -254,7 +306,7 @@ def weighted_loss(logits,labels,number_class, frequency):
     Loss
     Accuracy
     """
-    label_flatten = tf.reshape(labels,[-1])
+    label_flatten = tf.reshape(labels,[-1,1])
     label_onehot = tf.reshape(tf.one_hot(label_flatten,depth=number_class),[-1,11])
     print(label_flatten)
     print(label_onehot)
@@ -262,7 +314,7 @@ def weighted_loss(logits,labels,number_class, frequency):
     loss = tf.reduce_mean(cross_entropy,name = "cross_entropy")
     argmax_logit = tf.to_int32(tf.argmax(logits,axis= -1))
     argmax_label = tf.to_int32(tf.argmax(label_onehot,axis= -1))
-    correct = tf.to_float(tf.equal(tf.reshape(argmax_logit,[-1]),tf.reshape(argmax_label,[-1])))
+    correct = tf.to_float(tf.equal(tf.reshape(argmax_logit,[-1]),argmax_label))
     accuracy = tf.reduce_mean(correct)
     return loss, accuracy, argmax_logit 
 
@@ -272,40 +324,46 @@ def train_op(total_loss,global_step):
     change some part
     Input:
     total_loss: The loss 
-    global_step: Now I have no idea about what is global step, in tensorflow: it says opetional Variable to increment by one 
-    after the variable have been updated
+    global_step: global_step is used to track how many batches had been passed. In the training process, the intial
+    value for global_step is 0 (tf.variable(0,trainable=False)), then after one batch of images passed, the loss is
+    passed into the optimizor to update the weight, then the global step increased by one. Number of batches seen 
+    by the graph.. Reference: https://stackoverflow.com/questions/41166681/what-does-tensorflow-global-step-mean
     Output
     The train_op
     """
-    Learning_Rate = 0.1
-    MOVING_AVERAGE_DECAY = 0.999
-    optimizer = tf.train.AdamOptimizer(learning_rate = Learning_Rate)
-    print(total_loss)
-    grads_and_vars = optimizer.compute_gradients(total_loss)
-    apply_grad_op = optimizer.apply_gradients(grads_and_vars)
+    Learning_Rate = 0.001
+   # MOVING_AVERAGE_DECAY = 0.99
+    #optimizer = tf.train.GradientDescentOptimizer(learning_rate = Learning_Rate)
+    optimizer = tf.train.AdamOptimizor(learning_rate = Learning_Rate)
+    #grads_and_vars = optimizer.compute_gradients(total_loss)
+    #apply_grad_op = optimizer.apply_gradients(grads_and_vars,global_step = global_step)
     
     #Add histograms for training variables
-    for var in tf.trainable_variables():
-        tf.summary.histogram(var.op.name,var)
+    #for var in tf.trainable_variables():
+    #    tf.summary.histogram(var.op.name,var)
         
     #Add histograms for gradients
-    for grad, var in grads_and_vars:
-        if grad is not None:
-            tf.summary.histogram(var.op.name + '/gradients', grad)
+    #for grad, var in grads_and_vars:
+    #    if grad is not None:
+    #        tf.summary.histogram(var.op.name + '/gradients', grad)
             
     #Tracking the moving averages of all the trainable variables. Because for some models, using the moving average to 
     #represent the value will improve the performance very well. 
     #The reference is from here https://www.tensorflow.org/versions/r0.12/api_docs/python/train/moving_averages
-    variable_averages = tf.train.ExponentialMovingAverage(MOVING_AVERAGE_DECAY)
-    
+    #variable_averages = tf.train.ExponentialMovingAverage(MOVING_AVERAGE_DECAY)
+    #Create shadow variables, and add ops to maintain moving averages for the trainable_variables
+    #shadow_variable = decay*shawdow_variable+(1-decay)*variables
+    #maintain_averages_op = variable_averages.apply(tf.trainable_variables())
+    #print("trainable_variable",tf.trainable_variables())
+    #To make sure the trainable variables only include the weight and bias for the decoder part
     
     #so here tf.trainable_variables only include the weight, bias for the decoder part, so instead of calling the variables 
     #one by one, it's much easier to call them by trainable_variables, since we have already define the training_phase in our
     #layers.
-    with tf.control_dependencies([apply_grad_op]):
-        train_op = variable_averages.apply(tf.trainable_variables())
-        
-    return train_op
+    #with tf.control_dependencies([apply_grad_op]):
+        #training_op = tf.group(maintain_averages_op)
+    training_op = optimizer.minimize(total_loss,var_list = tf.trainable_variables(), global_step = global_step)    
+    return training_op
 
 def test(FLAGS):
     """
@@ -354,41 +412,42 @@ def test(FLAGS):
         #print("accu:", accu_total)
         #print("mean IU:", np.nanmean(iu))
         #np.nanmean ignore the nan value, calculat the mean along the specific axis
-        
-        
+
+
 def TRAINING():
     """
     As before, FLAGS including all the necessary information!
     """
-    max_steps = 101
-    batch_size = 5
-    train_dir = "./"
-    image_dir = "../SegNet/CamVid/train.txt"
-    val_dir = "../SegNet/CamVid/val.txt"
+    max_steps = 1
+    batch_size = 12
+    train_dir = "/zhome/1c/2/114196/Documents/SegNet-tensorflow/"
+    image_dir = "/zhome/1c/2/114196/Documents/SegNet/CamVid/train.txt"
+    val_dir = "/zhome/1c/2/114196/Documents/SegNet/CamVid/val.txt"
     image_w = 360
     image_h = 480
     image_c = 3
     
-    image_filename,label_filename = get_filename_list(image_dir)
-    image_filename = [".." + n for n in image_filename]
-    label_filename = [".." + n for n in label_filename]
-
-    val_image_filename, val_label_filename = get_filename_list(val_dir)
-    val_image_filename = [".." + n for n in val_image_filename]
-    val_label_filename = [".." + n for n in val_label_filename]
     
+    image_filename,label_filename = get_filename_list(image_dir)
+    val_image_filename, val_label_filename = get_filename_list(val_dir)
+    
+
+    #tf.reset_default_graph()
     with tf.Graph().as_default():
+    #with tf.device('/device:GPU:0'):
         
         train_data_tensor = tf.placeholder(tf.float32, [batch_size, image_w, image_h, image_c])
         train_label_tensor = tf.placeholder(tf.int64, [batch_size, image_w, image_h, 1])
-        #val_data_tensor = tf.placeholder(tf.float32, [batch_size, image_w, image_h, image_c])
-        #val_label_tensor = tf.placeholder(tf.int64, [batch_size, image_w, image_h, 1])
+        
         
         phase_train = tf.placeholder(tf.bool, name = "phase_train")
         global_step = tf.Variable(0, trainable = False)
         
-        images_train, labels_train = CamVidInputs(image_filename, label_filename, batch_size)
-        images_val, labels_val = CamVidInputs(val_image_filename, val_label_filename, batch_size)
+        min_queue_train = 300
+        min_queue_val = 90
+        images_train, labels_train = CamVidInputs(image_filename, label_filename, batch_size, min_queue_train)
+        images_val, labels_val = CamVidInputs(val_image_filename, val_label_filename, batch_size,min_queue_val)
+        
         
         
         loss, accuracy, logits, prediction = inference(train_data_tensor, train_label_tensor, batch_size, phase_train)
@@ -396,27 +455,26 @@ def TRAINING():
         
         saver = tf.train.Saver(tf.global_variables())
         
-        summary_op = tf.summary.merge_all()
+        #summary_op = tf.summary.merge_all()
         #Merges all summaries collected in the default graph.
         
-        config = tf.ConfigProto()
-        config.gpu_options.allow_growth = True
-        with tf.Session(config=config) as sess:
+        #config = tf.ConfigProto(log_device_placement = True)
+        #config = tf.ConfigProto()
+        #config.gpu_options.per_process_gpu_memory_fraction = 0.8
+        #config.operation_timeout_in_ms = 10000
+        with tf.Session() as sess:
+        #with tf.device('/device:GPU:2'):
+            coord = tf.train.Coordinator()
+            threads = tf.train.start_queue_runners(coord = coord)            
+            
             init = tf.global_variables_initializer()
             sess.run(init)
-            
-          
-        #The queue runners basic reference: https://www.tensorflow.org/versions/r0.12/how_tos/threading_and_queues/
-        #This is utilized to make sure that each image only use once?
-            coord = tf.train.Coordinator()
-            threads = tf.train.start_queue_runners(sess = sess, coord = coord)
-        
-            
+        #The queue runners basic reference: https://www.tensorflow.org/versions/r0.12/how_tos/threading_and_queues
             train_loss, train_accuracy = [],[]
             val_loss, val_acc = [],[]
-            
         
             for step in range(max_steps):
+                
                 _train_loss, _train_accuracy = [],[]
                 image_batch, label_batch = sess.run([images_train,labels_train])
             #But I have to say I run to run this outside of this, but it doesn't read the data, so there must be something 
@@ -430,24 +488,26 @@ def TRAINING():
                 _train_loss.append(_loss)
                 _train_accuracy.append(_accuracy)
                 if step % 10 == 0:
+                    print("Training is On......")
                     train_loss.append(np.mean(_train_loss))
                     train_accuracy.append(np.mean(_train_accuracy))
                     
-                    pred = sess.run(prediction, feed_dict = feed_dict)
+                    #pred = sess.run(prediction, feed_dict = feed_dict)
+                    print("Iteration {}: Train Loss {:6.3f}, Train Accu{:6.3f}".format(step, train_loss[-1], train_accuracy[-1]))
                     #per_class_acc(pred, label_batch) 
                     #per_class_acc is a function from utils 
                     
-                if step % 10 == 0:
+                if step % 30 == 0:
                     print("start validating.......")
                     
-                    for test_step in range(int(4)):
+                    for test_step in range(int(9)):
                         _val_loss = []
                         _val_acc = []
                         fetches_valid = [loss, accuracy]
                         image_batch_val, label_batch_val = sess.run([images_val, labels_val])
                         feed_dict_valid = {train_data_tensor: image_batch_val,
                                           train_label_tensor: label_batch_val,
-                                          phase_train:True}
+                                          phase_train:False}
                         _loss, _acc = sess.run(fetches_valid, feed_dict_valid)
                         
                         _val_loss.append(_loss)
@@ -456,14 +516,50 @@ def TRAINING():
                     val_loss.append(np.mean(_val_loss))
                     val_acc.append(np.mean(_val_acc))
                     
-                    print("Epoch {}: Train Loss {:6.3f}, Train Accu{:6.3f}, Val Loss {:6.3f}, Val Acc {:6.3f}".format(
+                    print("Iteration {}: Train Loss {:6.3f}, Train Accu{:6.3f}, Val Loss {:6.3f}, Val Acc {:6.3f}".format(
                     step, train_loss[-1], train_accuracy[-1], val_loss[-1], val_acc[-1]))
                     
-                if step % 1000 == 0:
+                if step == max_steps:
+                    return train_loss, train_accuracy, val_loss, val_acc
                     checkpoint_path = os.path.join(train_dir,'model.ckpt')
-                    saver.save(sess,checkpoint_path,global_step = step)
+                    saver.save(sess,checkpoint_path,global_step = step) 
+
+
                     
             coord.request_stop()
             coord.join(threads)
+            
+            
+
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+        
+        
+
             
               
