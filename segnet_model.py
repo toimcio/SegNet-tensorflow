@@ -9,7 +9,8 @@ from Inputs import *
 
 
 
-vgg16_npy_path = "/zhome/1c/2/114196/Documents/SegNet-tensorflow/vgg16.npy"
+#vgg16_npy_path = "/zhome/1c/2/114196/Documents/SegNet-tensorflow/vgg16.npy"
+vgg16_npy_path = "vgg16.npy"
 def vgg_param_load(vgg16_npy_path): 
     vgg_param_dict = np.load(vgg16_npy_path,encoding='latin1').item()
     for key in vgg_param_dict:
@@ -334,7 +335,7 @@ def train_op(total_loss,global_step):
     Learning_Rate = 0.001
    # MOVING_AVERAGE_DECAY = 0.99
     #optimizer = tf.train.GradientDescentOptimizer(learning_rate = Learning_Rate)
-    optimizer = tf.train.AdamOptimizor(learning_rate = Learning_Rate)
+    optimizer = tf.train.AdamOptimizer(learning_rate = Learning_Rate)
     #grads_and_vars = optimizer.compute_gradients(total_loss)
     #apply_grad_op = optimizer.apply_gradients(grads_and_vars,global_step = global_step)
     
@@ -420,9 +421,12 @@ def TRAINING():
     """
     max_steps = 1
     batch_size = 12
-    train_dir = "/zhome/1c/2/114196/Documents/SegNet-tensorflow/"
-    image_dir = "/zhome/1c/2/114196/Documents/SegNet/CamVid/train.txt"
-    val_dir = "/zhome/1c/2/114196/Documents/SegNet/CamVid/val.txt"
+    #train_dir = "/zhome/1c/2/114196/Documents/SegNet-tensorflow/"
+    #image_dir = "/zhome/1c/2/114196/Documents/SegNet/CamVid/train.txt"
+    #val_dir = "/zhome/1c/2/114196/Documents/SegNet/CamVid/val.txt"
+    train_dir = ""
+    image_dir = "SegNet/CamVid/train.txt"
+    val_dir = "SegNet/CamVid/val.txt"
     image_w = 360
     image_h = 480
     image_c = 3
@@ -528,38 +532,3 @@ def TRAINING():
                     
             coord.request_stop()
             coord.join(threads)
-            
-            
-
-             
-             
-             
-             
-             
-             
-             
-             
-             
-             
-             
-             
-             
-             
-             
-             
-             
-             
-             
-             
-             
-             
-             
-             
-             
-             
-             
-        
-        
-
-            
-              
