@@ -18,6 +18,8 @@ def vgg_param_load(vgg16_npy_path):
     return vgg_param_dict
     
 vgg_param_dict = vgg_param_load(vgg16_npy_path)   
+
+NUM_CLASS = 12
                
 def inference(images, labels, batch_size, training_state):
     """
@@ -98,14 +100,14 @@ def inference(images, labels, batch_size, training_state):
     
     with tf.variable_scope('conv_classifier') as scope:
         kernel = _variable_with_weight_decay('weights',
-                                           shape=[1, 1, 64, 11],
+                                           shape=[1, 1, 64, NUM_CLASS],
                                            initializer=_initialization(1,64),
-                                           wd=0.0005)
+                                           wd=0.0005,enc = False)
         conv = tf.nn.conv2d(deconv5_3, kernel, [1, 1, 1, 1], padding='SAME')
-        biases = _variable_on_cpu('biases', [11], tf.constant_initializer(0.0))
+        biases = _variable_on_cpu('biases', [NUM_CLASS], tf.constant_initializer(0.0),enc = False)
         conv_classifier = tf.nn.bias_add(conv, biases, name=scope.name)
-
-    prob = conv_classifier
+    print(conv_classifier)
+    prob = tf.nn.softmax(conv_classifier,name = "prob")
     print("prob", prob)
     
     loss, accuracy, logits, prediction = cal_loss(prob,labels)
@@ -139,7 +141,7 @@ def conv_layer(bottom, name, shape, training_state):
     out_channel = shape[3]
     with tf.variable_scope(name):
         #filt = get_conv_filter(name)
-        filt = _variable_with_weight_decay('weights',shape = shape, initializer = _initialization(kernel_size,input_channel), wd = False)
+        filt = _variable_with_weight_decay('weights',shape = shape, initializer = _initialization(kernel_size,input_channel), wd = False,enc = False)
         conv = tf.nn.conv2d(bottom, filt, [1, 1, 1, 1], padding='SAME')
         #conv_biases = get_bias(name)
         conv_biases = tf.get_variable(name+"bias",shape = out_channel, initializer = tf.constant_initializer(0.1))
@@ -166,12 +168,12 @@ def conv_layer_enc(bottom, name, shape, training_state):
     #out_channel = shape[3]
     with tf.variable_scope(name):
         init = get_conv_filter(name)
-        init = tf.constant(init)
-        filt = _variable_with_weight_decay('weights',shape = shape, initializer = init, wd = False)
+        #init = tf.constant(init)
+        filt = _variable_with_weight_decay('weights',shape = shape, initializer = init, wd = False,enc = True)
         conv = tf.nn.conv2d(bottom, filt, [1, 1, 1, 1], padding='SAME')
         conv_biases_init = get_bias(name)
-        conv_biases_init = tf.contant(conv_biases_init)
-        conv_biases = tf.get_variable(name+"bias",shape = out_channel, initializer = conv_biases_init)
+        #conv_biases_init = tf.contant(conv_biases_init)
+        conv_biases = tf.get_variable(name+"bias", initializer = conv_biases_init)
         bias = tf.nn.bias_add(conv, conv_biases)
         out = batch_norm(bias,training_state,name)
             
@@ -255,28 +257,28 @@ def _initialization(k,c):
 
 
     
-def deconv_layer(inputs,kernel_size,output_shape,name,training_state):
-    """
-    This deconv_layer is utilized to convolve with the upsampled output, and also layer output
-    output_shape is different for different layers
-    The kernel_size = [height,width,output_channel,input_channel]
-    """
-    bias_shape = output_shape[-1]
-    weight_shape = kernel_size
-    k = kernel_size[0]
-    c = kernel_size[3]
-    with tf.variable_scope(name):
-        weights = tf.get_variable(name+"weight",shape=weight_shape,initializer = _initialization(k,c))
-        bias = tf.get_variable(name+"bias",shape = bias_shape, initializer = tf.constant_initializer(0.1))
-        deconv = tf.nn.conv2d_transpose(inputs,weights,output_shape = output_shape,strides = [1,1,1,1],padding='SAME')
-        bias = tf.nn.bias_add(deconv, bias)
-        out = batch_norm(bias,training_state,name)
-         
-        relu = tf.nn.relu(out)
-        print(relu)
-        return relu
+#def deconv_layer(inputs,kernel_size,output_shape,name,training_state):
+#    """
+#    This deconv_layer is utilized to convolve with the upsampled output, and also layer output
+#    output_shape is different for different layers
+#    The kernel_size = [height,width,output_channel,input_channel]
+#    """
+#    bias_shape = output_shape[-1]
+#    weight_shape = kernel_size
+#    k = kernel_size[0]
+#    c = kernel_size[3]
+#    with tf.variable_scope(name):
+#        weights = tf.get_variable(name+"weight",shape=weight_shape,initializer = _initialization(k,c))
+#        bias = tf.get_variable(name+"bias",shape = bias_shape, initializer = tf.constant_initializer(0.1))
+#        deconv = tf.nn.conv2d_transpose(inputs,weights,output_shape = output_shape,strides = [1,1,1,1],padding='SAME')
+#        bias = tf.nn.bias_add(deconv, bias)
+#        out = batch_norm(bias,training_state,name)
+#         
+#        relu = tf.nn.relu(out)
+#        print(relu)
+#        return relu
     
-def _variable_on_cpu(name,shape,initializer):
+def _variable_on_cpu(name,shape,initializer,enc):
     """
     Help to create a variable which can be stored on CPU memory
     Inputs: 
@@ -287,10 +289,13 @@ def _variable_on_cpu(name,shape,initializer):
     Variable tensor
     """
     with tf.device('/cpu:0'):
-        var = tf.get_variable(name,shape,initializer = initializer)
+        if enc is True:
+            var = tf.get_variable(name,initializer = initializer)
+        else:
+            var = tf.get_variable(name,shape,initializer = initializer)
     return var 
 
-def _variable_with_weight_decay(name,shape,initializer,wd):
+def _variable_with_weight_decay(name,shape,initializer,wd,enc):
     """
     Help to create an initialized variable with weight decay
     The variable is initialized with a truncated normal distribution, only the value for standard deviation is determined
@@ -298,7 +303,7 @@ def _variable_with_weight_decay(name,shape,initializer,wd):
     Inputs: wd is utilized to noticify if weight decay is utilized 
     Return: varialbe tensor
     """
-    var = _variable_on_cpu(name,shape,initializer)
+    var = _variable_on_cpu(name,shape,initializer,enc)
     if wd is True:
         weight_decay = tf.multiply(tf.nn.l2_loss(var),wd,name='weight_loss')
         tf.add_to_collection('losses',weight_decay)
@@ -320,11 +325,11 @@ def cal_loss(logits,labels):
     0.6823,
     6.2478,
     7.3614,
+    1.0974
     ]) 
     #class 0 to 11, but the class 11 is ignored, so maybe the class 11 is background!
     
     labels = tf.cast(labels, tf.int32)
-    NUM_CLASS = 11
     loss,accuracy,prediction = weighted_loss(logits,labels,number_class = NUM_CLASS, frequency = loss_weight)
     return loss, accuracy, logits, prediction
 
@@ -346,16 +351,34 @@ def weighted_loss(logits,labels,number_class, frequency):
     Accuracy
     """
     label_flatten = tf.reshape(labels,[-1,1])
-    label_onehot = tf.reshape(tf.one_hot(label_flatten,depth=number_class),[-1,11])
+    label_onehot = tf.reshape(tf.one_hot(label_flatten,depth=number_class),[-1,number_class])
     print(label_flatten)
     print(label_onehot)
-    cross_entropy = -tf.reduce_sum(tf.multiply((label_onehot*tf.log(tf.reshape(logits,[-1,11])+1e-10)),frequency),reduction_indices=[1])
+    cross_entropy = -tf.reduce_sum(tf.multiply((label_onehot*tf.log(tf.reshape(logits,[-1,number_class])+1e-10)),frequency),reduction_indices=[1])
     loss = tf.reduce_mean(cross_entropy,name = "cross_entropy")
     argmax_logit = tf.to_int32(tf.argmax(logits,axis= -1))
     argmax_label = tf.to_int32(tf.argmax(label_onehot,axis= -1))
     correct = tf.to_float(tf.equal(tf.reshape(argmax_logit,[-1]),argmax_label))
     accuracy = tf.reduce_mean(correct)
     return loss, accuracy, argmax_logit 
+    
+def Normal_Loss(logits,labels,number_class):
+    """
+    Calculate the normal loss instead of median frequency balancing
+    Inputs: logits, value should be in the interval of [0,1]
+    lables: the atual label information'
+    number_class:12
+    Output:loss,and accuracy
+    """
+    label_flatten = tf.reshape(labels,[-1,1])
+    label_onehot = tf.reshape(tf.one_hot(label_flatten,depth = number_class),[-1,number_class])
+    cross_entropy = -tf.reduce_sum(tf.multiply(label_onehot*tf.log(tf.reshape(logits,[-1,number_class])+1e-10)),reduction_indices = [1])
+    loss = tf.reduce_mean(cross_entropy)
+    
+    return loss
+    
+
+    
 
 def train_op(total_loss,global_step):
     """
@@ -457,8 +480,8 @@ def TRAINING():
     """
     As before, FLAGS including all the necessary information!
     """
-    max_steps = 1000
-    batch_size = 12
+    max_steps = 10000
+    batch_size = 5
     train_dir = "/zhome/1c/2/114196/Documents/SegNet-tensorflow/"
     image_dir = "/zhome/1c/2/114196/Documents/SegNet/CamVid/train.txt"
     val_dir = "/zhome/1c/2/114196/Documents/SegNet/CamVid/val.txt"
@@ -515,7 +538,7 @@ def TRAINING():
         
             for step in range(max_steps):
                 
-                _train_loss, _train_accuracy = [],[]
+                
                 image_batch, label_batch = sess.run([images_train,labels_train])
             #But I have to say I run to run this outside of this, but it doesn't read the data, so there must be something 
             #wrong
@@ -525,8 +548,10 @@ def TRAINING():
             
                 _, _loss, _accuracy = sess.run([train, loss, accuracy], feed_dict = feed_dict)
                 
-                _train_loss.append(_loss)
-                _train_accuracy.append(_accuracy)
+                train_loss.append(_loss)
+                train_accuracy.append(_accuracy)
+                #print('trainable_variables',tf.trainable_variables())
+                #print('probility',logits)
                 #if step % 10 == 0:
                     #print("Training is On......")
                     #train_loss.append(np.mean(_train_loss))
@@ -536,13 +561,12 @@ def TRAINING():
                     #print("Iteration {}: Train Loss {:6.3f}, Train Accu{:6.3f}".format(step, train_loss[-1], train_accuracy[-1]))
                     #per_class_acc(pred, label_batch) 
                     #per_class_acc is a function from utils 
-                    
+                   
                 if step % 100 == 0:
                     print("start validating.......")
-                    
-                    for test_step in range(int(9)):
-                        _val_loss = []
-                        _val_acc = []
+                    _val_loss = []
+                    _val_acc = []
+                    for test_step in range(int(20)):
                         fetches_valid = [loss, accuracy]
                         image_batch_val, label_batch_val = sess.run([images_val, labels_val])
                         feed_dict_valid = {train_data_tensor: image_batch_val,
@@ -556,15 +580,15 @@ def TRAINING():
                         _val_loss.append(_loss)
                         _val_acc.append(_acc)
                         
-                    train_loss.append(np.mean(_train_loss))
-                    train_accuracy.append(np.mean(_train_accuracy))
+                    #train_loss.append(np.mean(_train_loss))
+                    #train_accuracy.append(np.mean(_train_accuracy))
                     val_loss.append(np.mean(_val_loss))
                     val_acc.append(np.mean(_val_acc))
                     
                     print("Iteration {}: Train Loss {:6.3f}, Train Accu{:6.3f}, Val Loss {:6.3f}, Val Acc {:6.3f}".format(
                     step, train_loss[-1], train_accuracy[-1], val_loss[-1], val_acc[-1]))
                     
-                if step == max_steps:
+                if step == (max_steps-1):
                     return train_loss, train_accuracy, val_loss, val_acc
                     checkpoint_path = os.path.join(train_dir,'model.ckpt')
                     saver.save(sess,checkpoint_path,global_step = step) 
