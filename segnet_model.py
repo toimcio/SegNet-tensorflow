@@ -9,8 +9,7 @@ from Inputs import *
 
 
 
-#vgg16_npy_path = "/zhome/1c/2/114196/Documents/SegNet-tensorflow/vgg16.npy"
-vgg16_npy_path = "vgg16.npy"
+vgg16_npy_path = "/zhome/1c/2/114196/Documents/SegNet-tensorflow/vgg16.npy"
 def vgg_param_load(vgg16_npy_path): 
     vgg_param_dict = np.load(vgg16_npy_path,encoding='latin1').item()
     for key in vgg_param_dict:
@@ -29,31 +28,31 @@ def inference(images, labels, batch_size, training_state):
     """
     
     #first box of convolution layer,each part we do convolution two times, so we have conv1_1, and conv1_2
-    conv1_1 = conv_layer(images, "conv1_1", [3,3,3,64], training_state)
-    conv1_2 = conv_layer(conv1_1, "conv1_2", [3,3,64,64], training_state)
+    conv1_1 = conv_layer_enc(images, "conv1_1", [3,3,3,64], training_state)
+    conv1_2 = conv_layer_enc(conv1_1, "conv1_2", [3,3,64,64], training_state)
     pool1,pool1_index,shape_1 = max_pool(conv1_2, 'pool1')
     
     #Second box of covolution layer(4)
-    conv2_1 = conv_layer(pool1, "conv2_1", [3,3,64,128], training_state)
-    conv2_2 = conv_layer(conv2_1, "conv2_2",[3,3,128,128], training_state)
+    conv2_1 = conv_layer_enc(pool1, "conv2_1", [3,3,64,128], training_state)
+    conv2_2 = conv_layer_enc(conv2_1, "conv2_2",[3,3,128,128], training_state)
     pool2,pool2_index,shape_2 = max_pool(conv2_2, 'pool2')
     
     #Third box of covolution layer(7)
-    conv3_1 = conv_layer(pool2, "conv3_1", [3,3,128,256], training_state)
-    conv3_2 = conv_layer(conv3_1, "conv3_2",[3,3,256,256], training_state)
-    conv3_3 = conv_layer(conv3_2, "conv3_3", [3,3,256,256],training_state)
+    conv3_1 = conv_layer_enc(pool2, "conv3_1", [3,3,128,256], training_state)
+    conv3_2 = conv_layer_enc(conv3_1, "conv3_2",[3,3,256,256], training_state)
+    conv3_3 = conv_layer_enc(conv3_2, "conv3_3", [3,3,256,256],training_state)
     pool3,pool3_index,shape_3 = max_pool(conv3_3, 'pool3')
     
     #Fourth box of covolution layer(10)
-    conv4_1 = conv_layer(pool3, "conv4_1", [3,3,256,512], training_state)
-    conv4_2 = conv_layer(conv4_1, "conv4_2", [3,3,512,512], training_state)
-    conv4_3 = conv_layer(conv4_2, "conv4_3", [3,3,512,512], training_state)
+    conv4_1 = conv_layer_enc(pool3, "conv4_1", [3,3,256,512], training_state)
+    conv4_2 = conv_layer_enc(conv4_1, "conv4_2", [3,3,512,512], training_state)
+    conv4_3 = conv_layer_enc(conv4_2, "conv4_3", [3,3,512,512], training_state)
     pool4,pool4_index,shape_4 = max_pool(conv4_3, 'pool4')
 
     #Fifth box of covolution layers(13)
-    conv5_1 = conv_layer(pool4, "conv5_1", [3,3,512,512], training_state)
-    conv5_2 = conv_layer(conv5_1, "conv5_2",[3,3,512,512], training_state)
-    conv5_3 = conv_layer(conv5_2, "conv5_3",[3,3,512,512], training_state)
+    conv5_1 = conv_layer_enc(pool4, "conv5_1", [3,3,512,512], training_state)
+    conv5_2 = conv_layer_enc(conv5_1, "conv5_2",[3,3,512,512], training_state)
+    conv5_3 = conv_layer_enc(conv5_2, "conv5_3",[3,3,512,512], training_state)
     pool5, pool5_index,shape_5 = max_pool(conv5_3, 'pool5')
         
         
@@ -95,8 +94,19 @@ def inference(images, labels, batch_size, training_state):
     #deconv5_2 = deconv_layer(deconv5_1,[3,3,64,64],shape_1,"deconv5_2",training_state)
     #deconv5_3 = deconv_layer(deconv5_2,[3,3,11,64],[shape_1[0],shape_1[1],shape_1[2],11],"deconv5_3",training_state)
     deconv5_2 = conv_layer(deconv5_1, "deconv5_2", [3,3,64,64], training_state)
-    deconv5_3 = conv_layer(deconv5_2, "deconv5_3", [3,3,64,11], training_state)
-    prob = tf.nn.softmax(deconv5_3,name = "prob")
+    deconv5_3 = conv_layer(deconv5_2, "deconv5_3", [3,3,64,64], training_state)
+    
+    with tf.variable_scope('conv_classifier') as scope:
+        kernel = _variable_with_weight_decay('weights',
+                                           shape=[1, 1, 64, 11],
+                                           initializer=_initialization(1,64),
+                                           wd=0.0005)
+        conv = tf.nn.conv2d(deconv5_3, kernel, [1, 1, 1, 1], padding='SAME')
+        biases = _variable_on_cpu('biases', [11], tf.constant_initializer(0.0))
+        conv_classifier = tf.nn.bias_add(conv, biases, name=scope.name)
+
+    prob = conv_classifier
+    print("prob", prob)
     
     loss, accuracy, logits, prediction = cal_loss(prob,labels)
     return loss, accuracy, logits, prediction
@@ -140,6 +150,34 @@ def conv_layer(bottom, name, shape, training_state):
         print(relu)
         return relu
         #norm is used to identify if we should use batch normalization!
+        
+def conv_layer_enc(bottom, name, shape, training_state):
+    """
+    Inputs:
+    bottom: The input image or tensor
+    name: corresponding layer's name
+    shape: the shape of kernel size
+    training_state: represent if the weight should update 
+    Output:
+    The output from layers
+    """
+    #kernel_size = shape[0]
+    #input_channel = shape[2]
+    #out_channel = shape[3]
+    with tf.variable_scope(name):
+        init = get_conv_filter(name)
+        init = tf.constant(init)
+        filt = _variable_with_weight_decay('weights',shape = shape, initializer = init, wd = False)
+        conv = tf.nn.conv2d(bottom, filt, [1, 1, 1, 1], padding='SAME')
+        conv_biases_init = get_bias(name)
+        conv_biases_init = tf.contant(conv_biases_init)
+        conv_biases = tf.get_variable(name+"bias",shape = out_channel, initializer = conv_biases_init)
+        bias = tf.nn.bias_add(conv, conv_biases)
+        out = batch_norm(bias,training_state,name)
+            
+        relu = tf.nn.relu(out)
+        print(relu)
+        return relu
 def batch_norm(bias_input, is_training, scope):
     if is_training is True:
         return tf.contrib.layers.batch_norm(bias_input,is_training = True,center = False,
@@ -419,14 +457,11 @@ def TRAINING():
     """
     As before, FLAGS including all the necessary information!
     """
-    max_steps = 1
+    max_steps = 1000
     batch_size = 12
-    #train_dir = "/zhome/1c/2/114196/Documents/SegNet-tensorflow/"
-    #image_dir = "/zhome/1c/2/114196/Documents/SegNet/CamVid/train.txt"
-    #val_dir = "/zhome/1c/2/114196/Documents/SegNet/CamVid/val.txt"
-    train_dir = ""
-    image_dir = "SegNet/CamVid/train.txt"
-    val_dir = "SegNet/CamVid/val.txt"
+    train_dir = "/zhome/1c/2/114196/Documents/SegNet-tensorflow/"
+    image_dir = "/zhome/1c/2/114196/Documents/SegNet/CamVid/train.txt"
+    val_dir = "/zhome/1c/2/114196/Documents/SegNet/CamVid/val.txt"
     image_w = 360
     image_h = 480
     image_c = 3
@@ -468,11 +503,12 @@ def TRAINING():
         #config.operation_timeout_in_ms = 10000
         with tf.Session() as sess:
         #with tf.device('/device:GPU:2'):
+            init = tf.global_variables_initializer()
+            sess.run(init)
+            
             coord = tf.train.Coordinator()
             threads = tf.train.start_queue_runners(coord = coord)            
             
-            init = tf.global_variables_initializer()
-            sess.run(init)
         #The queue runners basic reference: https://www.tensorflow.org/versions/r0.12/how_tos/threading_and_queues
             train_loss, train_accuracy = [],[]
             val_loss, val_acc = [],[]
@@ -491,17 +527,17 @@ def TRAINING():
                 
                 _train_loss.append(_loss)
                 _train_accuracy.append(_accuracy)
-                if step % 10 == 0:
-                    print("Training is On......")
-                    train_loss.append(np.mean(_train_loss))
-                    train_accuracy.append(np.mean(_train_accuracy))
+                #if step % 10 == 0:
+                    #print("Training is On......")
+                    #train_loss.append(np.mean(_train_loss))
+                    #train_accuracy.append(np.mean(_train_accuracy))
                     
                     #pred = sess.run(prediction, feed_dict = feed_dict)
-                    print("Iteration {}: Train Loss {:6.3f}, Train Accu{:6.3f}".format(step, train_loss[-1], train_accuracy[-1]))
+                    #print("Iteration {}: Train Loss {:6.3f}, Train Accu{:6.3f}".format(step, train_loss[-1], train_accuracy[-1]))
                     #per_class_acc(pred, label_batch) 
                     #per_class_acc is a function from utils 
                     
-                if step % 30 == 0:
+                if step % 100 == 0:
                     print("start validating.......")
                     
                     for test_step in range(int(9)):
@@ -511,12 +547,17 @@ def TRAINING():
                         image_batch_val, label_batch_val = sess.run([images_val, labels_val])
                         feed_dict_valid = {train_data_tensor: image_batch_val,
                                           train_label_tensor: label_batch_val,
-                                          phase_train:False}
+                                          phase_train:True}
+                                          #since we still using mini-batch, so in the batch norm we set phase_train to be
+                                          #true, and because we didin't run the trainop process, so it will not update
+                                          #the weight!
                         _loss, _acc = sess.run(fetches_valid, feed_dict_valid)
                         
                         _val_loss.append(_loss)
                         _val_acc.append(_acc)
                         
+                    train_loss.append(np.mean(_train_loss))
+                    train_accuracy.append(np.mean(_train_accuracy))
                     val_loss.append(np.mean(_val_loss))
                     val_acc.append(np.mean(_val_acc))
                     
@@ -532,3 +573,38 @@ def TRAINING():
                     
             coord.request_stop()
             coord.join(threads)
+            
+            
+
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+             
+        
+        
+
+            
+              
