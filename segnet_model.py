@@ -28,9 +28,12 @@ def inference(images, labels, batch_size, training_state):
     batch_size
     phase_train: is utilized to noticify if the parameter should keep as a constant or keep updating 
     """
-    
+    #Before enter the images into the archetecture, we need to do Local Contrast Normalization 
+    #But it seems a bit complicated, so we use Local Response Normalization which implement in Tensorflow
+    #Reference page:https://www.tensorflow.org/api_docs/python/tf/nn/local_response_normalization
+    norm1 = tf.nn.lrn(images,depth_radius = 5, bias = 1.0, alpha=0.0001,beta=0.75,name = 'norm1')
     #first box of convolution layer,each part we do convolution two times, so we have conv1_1, and conv1_2
-    conv1_1 = conv_layer_enc(images, "conv1_1", [3,3,3,64], training_state)
+    conv1_1 = conv_layer_enc(norm1, "conv1_1", [3,3,3,64], training_state)
     conv1_2 = conv_layer_enc(conv1_1, "conv1_2", [3,3,64,64], training_state)
     pool1,pool1_index,shape_1 = max_pool(conv1_2, 'pool1')
     
@@ -102,16 +105,18 @@ def inference(images, labels, batch_size, training_state):
         kernel = _variable_with_weight_decay('weights',
                                            shape=[1, 1, 64, NUM_CLASS],
                                            initializer=_initialization(1,64),
-                                           wd=0.0005,enc = False)
+                                           wd=False,enc = False)
         conv = tf.nn.conv2d(deconv5_3, kernel, [1, 1, 1, 1], padding='SAME')
         biases = _variable_on_cpu('biases', [NUM_CLASS], tf.constant_initializer(0.0),enc = False)
         conv_classifier = tf.nn.bias_add(conv, biases, name=scope.name)
-    print(conv_classifier)
-    prob = tf.nn.softmax(conv_classifier,name = "prob")
-    print("prob", prob)
+
+    print('conv_classifier', conv_classifier)
     
-    loss, accuracy, logits, prediction = cal_loss(prob,labels)
-    return loss, accuracy, logits, prediction
+    loss, accuracy, prediction, logits = cal_loss(conv_classifier,labels)
+    loss_norm, accuracy, prediction, logits = Normal_Loss(conv_classifier,labels,NUM_CLASS)
+    
+    return loss_norm, accuracy, prediction, logits
+    
     
 
 
@@ -139,14 +144,14 @@ def conv_layer(bottom, name, shape, training_state):
     kernel_size = shape[0]
     input_channel = shape[2]
     out_channel = shape[3]
-    with tf.variable_scope(name):
+    with tf.variable_scope(name) as scope:
         #filt = get_conv_filter(name)
         filt = _variable_with_weight_decay('weights',shape = shape, initializer = _initialization(kernel_size,input_channel), wd = False,enc = False)
         conv = tf.nn.conv2d(bottom, filt, [1, 1, 1, 1], padding='SAME')
         #conv_biases = get_bias(name)
-        conv_biases = tf.get_variable(name+"bias",shape = out_channel, initializer = tf.constant_initializer(0.1))
+        conv_biases = tf.get_variable('biases',shape = out_channel, initializer = tf.constant_initializer(0.0))
         bias = tf.nn.bias_add(conv, conv_biases)
-        out = batch_norm(bias,training_state,name)
+        out = batch_norm(bias,training_state,scope.name)
             
         relu = tf.nn.relu(out)
         print(relu)
@@ -166,16 +171,16 @@ def conv_layer_enc(bottom, name, shape, training_state):
     #kernel_size = shape[0]
     #input_channel = shape[2]
     #out_channel = shape[3]
-    with tf.variable_scope(name):
-        init = get_conv_filter(name)
-        #init = tf.constant(init)
+    with tf.variable_scope(name) as scope:
+        init = get_conv_filter(scope.name)
+
         filt = _variable_with_weight_decay('weights',shape = shape, initializer = init, wd = False,enc = True)
         conv = tf.nn.conv2d(bottom, filt, [1, 1, 1, 1], padding='SAME')
-        conv_biases_init = get_bias(name)
-        #conv_biases_init = tf.contant(conv_biases_init)
-        conv_biases = tf.get_variable(name+"bias", initializer = conv_biases_init)
+        conv_biases_init = get_bias(scope.name)
+
+        conv_biases = tf.get_variable('biases', initializer = conv_biases_init)
         bias = tf.nn.bias_add(conv, conv_biases)
-        out = batch_norm(bias,training_state,name)
+        out = batch_norm(bias,training_state,scope.name)
             
         relu = tf.nn.relu(out)
         print(relu)
@@ -342,7 +347,7 @@ def weighted_loss(logits,labels,number_class, frequency):
     freq(c) is the number of pixles of class c divided by the total number of pixels in images where c is present
     we weight each pixels by alpha_c
     Inputs: 
-    logits is the output from the inference, which is the probability of the pixels belongs to class
+    logits is the output from the inference, which is the output of the decoder layers without softmax.
     labels: true label information 
     number_class: In the CamVid data set, it's 11 classes, or 12, because class 11 seems to be background? 
     frequency: is the frequency of each class
@@ -352,30 +357,42 @@ def weighted_loss(logits,labels,number_class, frequency):
     """
     label_flatten = tf.reshape(labels,[-1,1])
     label_onehot = tf.reshape(tf.one_hot(label_flatten,depth=number_class),[-1,number_class])
-    print(label_flatten)
-    print(label_onehot)
-    cross_entropy = -tf.reduce_sum(tf.multiply((label_onehot*tf.log(tf.reshape(logits,[-1,number_class])+1e-10)),frequency),reduction_indices=[1])
+    logits_reshape = tf.reshape(logits,[-1,number_class])
+    logits_softmax = tf.nn.softmax(logits_reshape)
+    cross_entropy = -tf.reduce_sum(tf.multiply((label_onehot*tf.log(logits_softmax+1e-10)),frequency),reduction_indices=[1])
     loss = tf.reduce_mean(cross_entropy,name = "cross_entropy")
-    argmax_logit = tf.to_int32(tf.argmax(logits,axis= -1))
-    argmax_label = tf.to_int32(tf.argmax(label_onehot,axis= -1))
-    correct = tf.to_float(tf.equal(tf.reshape(argmax_logit,[-1]),argmax_label))
+    argmax_logit = tf.to_int32(tf.argmax(logits_softmax,axis= -1))
+    argmax_label = tf.to_int32(tf.argmax(label_flatten,axis= -1))
+    correct = tf.to_float(tf.equal(argmax_logit,argmax_label))
     accuracy = tf.reduce_mean(correct)
     return loss, accuracy, argmax_logit 
     
 def Normal_Loss(logits,labels,number_class):
     """
     Calculate the normal loss instead of median frequency balancing
-    Inputs: logits, value should be in the interval of [0,1]
-    lables: the atual label information'
+    Inputs:
+    logits, the output from decoder layers, without softmax, shape [Num_batch,height,width,Number_class]
+    lables: the atual label information, shape [Num_batch,height,width,1]
     number_class:12
     Output:loss,and accuracy
+    Using tf.nn.sparse_softmax_cross_entropy_with_logits assume that each pixel have and only have one specific
+    label, instead of having a probability belongs to labels. Also assume that logits is not softmax, because it
+    will conduct a softmax internal to be efficient, this is the reason that we don't do softmax in the inference 
+    function!
     """
-    label_flatten = tf.reshape(labels,[-1,1])
-    label_onehot = tf.reshape(tf.one_hot(label_flatten,depth = number_class),[-1,number_class])
-    cross_entropy = -tf.reduce_sum(tf.multiply(label_onehot*tf.log(tf.reshape(logits,[-1,number_class])+1e-10)),reduction_indices = [1])
-    loss = tf.reduce_mean(cross_entropy)
+    label_flatten = tf.reshape(labels,[-1])
+    logits_reshape = tf.reshape(logits,[-1,number_class])
+    cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(labels = label_flatten,logits = logits_reshape,
+                                                                   name='normal_cross_entropy')
+    loss = tf.reduce_mean(cross_entropy,name = 'cross_entropy')
+    logits_softmax = tf.nn.softmax(logits_reshape)
+    argmax_logit = tf.to_int32(tf.argmax(logits_softmax,axis= -1))
+    argmax_label = tf.to_int32(label_flatten)
+    correct = tf.to_float(tf.equal(argmax_logit,argmax_label))
+    accuracy = tf.reduce_mean(correct)
     
-    return loss
+    
+    return loss, accuracy, argmax_logit,logits
     
 
     
@@ -393,10 +410,10 @@ def train_op(total_loss,global_step):
     Output
     The train_op
     """
-    Learning_Rate = 0.001
+    Learning_Rate = 0.1
    # MOVING_AVERAGE_DECAY = 0.99
     #optimizer = tf.train.GradientDescentOptimizer(learning_rate = Learning_Rate)
-    optimizer = tf.train.AdamOptimizer(learning_rate = Learning_Rate)
+    optimizer = tf.train.GradientDescentOptimizer(learning_rate = Learning_Rate)
     #grads_and_vars = optimizer.compute_gradients(total_loss)
     #apply_grad_op = optimizer.apply_gradients(grads_and_vars,global_step = global_step)
     
@@ -416,7 +433,7 @@ def train_op(total_loss,global_step):
     #Create shadow variables, and add ops to maintain moving averages for the trainable_variables
     #shadow_variable = decay*shawdow_variable+(1-decay)*variables
     #maintain_averages_op = variable_averages.apply(tf.trainable_variables())
-    #print("trainable_variable",tf.trainable_variables())
+    print("trainable_variable",tf.trainable_variables())
     #To make sure the trainable variables only include the weight and bias for the decoder part
     
     #so here tf.trainable_variables only include the weight, bias for the decoder part, so instead of calling the variables 
@@ -424,7 +441,7 @@ def train_op(total_loss,global_step):
     #layers.
     #with tf.control_dependencies([apply_grad_op]):
         #training_op = tf.group(maintain_averages_op)
-    training_op = optimizer.minimize(total_loss,var_list = tf.trainable_variables(), global_step = global_step)    
+    training_op = optimizer.minimize(total_loss, global_step = global_step)    
     return training_op
 
 def test(FLAGS):
@@ -506,13 +523,13 @@ def TRAINING():
         global_step = tf.Variable(0, trainable = False)
         
         min_queue_train = 300
-        min_queue_val = 90
+        min_queue_val = 101
         images_train, labels_train = CamVidInputs(image_filename, label_filename, batch_size, min_queue_train)
         images_val, labels_val = CamVidInputs(val_image_filename, val_label_filename, batch_size,min_queue_val)
         
         
         
-        loss, accuracy, logits, prediction = inference(train_data_tensor, train_label_tensor, batch_size, phase_train)
+        loss, accuracy, prediction, logits = inference(train_data_tensor, train_label_tensor, batch_size, phase_train)
         train = train_op(loss, global_step)
         
         saver = tf.train.Saver(tf.global_variables())
@@ -590,8 +607,8 @@ def TRAINING():
                     
                 if step == (max_steps-1):
                     return train_loss, train_accuracy, val_loss, val_acc
-                    checkpoint_path = os.path.join(train_dir,'model.ckpt')
-                    saver.save(sess,checkpoint_path,global_step = step) 
+                    #checkpoint_path = os.path.join(train_dir,'model.ckpt')
+                    #saver.save(sess,checkpoint_path,global_step = step) 
 
 
                     
