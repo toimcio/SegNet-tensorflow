@@ -30,7 +30,7 @@ def inference(images, labels, batch_size, training_state):
     images: is the input images, Training data also Test data
     labels: corresponding labels for images
     batch_size
-    phase_train: is utilized to noticify if the parameter should keep as a constant or keep updating 
+    phase_train: is utilized to notify if the parameter should keep as a constant or keep updating 
     """
     # Before enter the images into the archetecture, we need to do Local Contrast Normalization
     # But it seems a bit complicated, so we use Local Response Normalization which implement in Tensorflow
