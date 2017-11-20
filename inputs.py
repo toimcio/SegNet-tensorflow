@@ -21,8 +21,8 @@ def get_filename_list(path):
         image_filenames.append(i[0])
         label_filenames.append(i[1])
     
-    image_filenames = ["/zhome/1c/2/114196/Documents" + name for name in image_filenames]
-    label_filenames = ["/zhome/1c/2/114196/Documents" + name for name in label_filenames]
+    image_filenames = ["." + name for name in image_filenames]
+    label_filenames = ["." + name for name in label_filenames]
     return image_filenames, label_filenames
 
 
