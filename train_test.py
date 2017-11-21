@@ -34,22 +34,53 @@ def Test():
         loss_tot = []
         acc_tot = []
         pred_tot = []
+        var_tot = []
         step = 0
         for image_batch, label_batch in zip(images,labels):
             image_batch = np.reshape(image_batch,[1,image_h,image_w,image_c])
             label_batch = np.reshape(label_batch,[1,image_h,image_w,1])
-            feed_dict = {test_data_tensor: image_batch, test_label_tensor:label_batch, phase_train: False, keep_prob:1.0}
+            feed_dict = {test_data_tensor: image_batch, test_label_tensor:label_batch, phase_train: False, keep_prob:0.5}
             fetches = [loss, accuracy, logits, prediction]
-            loss_per, acc_per, logit, pred = sess.run(fetches = fetches, feed_dict = feed_dict)
+            if FLAG_BAYES is False:
+                loss_per, acc_per,logit,pred = sess.run(fetches = fetches, feed_dict = feed_dict)
+                var_one = []
+            else:
+                logit_iter_tot = []
+                loss_iter_tot = []
+                acc_iter_tot = []
+                for iter_step in range(30):
+                    loss_iter_step, acc_iter_step, logit_iter_step = sess.run(fetches = [loss,accuracy,logits], feed_dict = feed_dict)
+                    loss_iter_tot.append(loss_iter_step)                    
+                    acc_iter_tot.append(acc_iter_step)                    
+                    logit_iter_tot.append(logit_iter_step)
+                    
+                loss_per = np.nanmean(loss_iter_tot)
+                acc_per = np.nanmean(acc_iter_tot)
+                logit = np.mean(logit_iter_tot,axis = 0)
+                variance = np.var(logit_iter_tot, axis = 0)
+                #THIS TIME I DIDN'T INCLUDE TAU
+                pred = np.argmax(logit,axis = -1) #pred is the predicted label
+                var_sep = [] #var_sep is the corresponding variance if this pixel choose label k
+                length_cur = 0 #length_cur represent how many pixels has been read for one images
+                for row in variance:
+                    temp = row[pred[length_cur]]
+                    length_cur += 1
+                    var_sep.append(temp)
+                var_one = np.reshape(var_sep,[image_h,image_w]) #var_one is the corresponding variance in terms of the "optimal" label
+                    
             loss_tot.append(loss_per)
             acc_tot.append(acc_per)
             pred_tot.append(pred)
+            var_tot.append(var_one)
             print("Image Index {}: TEST Loss{:6.3f}, TEST Accu {:6.3f}".format(step, loss_tot[-1], acc_tot[-1]))
             step = step + 1
             per_class_acc(logit,label_batch,NUM_CLASS)
             hist += get_hist(logit, label_batch)
-            
-            
+            loss_per, acc_per, logit, pred = sess.run(fetches = fetches, feed_dict = feed_dict)
+            loss_tot.append(loss_per)
+            acc_tot.append(acc_per)
+            pred_tot.append(pred)
+               
         acc_tot = np.diag(hist).sum()/hist.sum()
         iu = np.diag(hist) / (hist.sum(1) + hist.sum(0) - np.diag(hist))
         
@@ -58,7 +89,7 @@ def Test():
         print("mean MoI for test images: ", np.nanmean(iu))
         
         
-        return acc_tot, pred_tot
+        return acc_tot, pred_tot,var_tot
         
 def Train():
     max_steps = 30001
