@@ -67,7 +67,7 @@ def inference(images, labels, batch_size, training_state):
     #------------------Then Let's start Decoder Process-----------------------------------------------------#
     
     #First box of decovolution layers(3)
-    deconv5_1 = up_sampling(pool5, pool5_index,shape=shape_5,name="unpool_5")
+    deconv5_1 = up_sampling(pool5, pool5_index,shape_5,name="unpool_5",ksize=[1, 2, 2, 1])
     #deconv1_2 = deconv_layer(deconv1_1,[3,3,512,512],shape_5,"deconv1_2",training_state)
     #deconv1_3 = deconv_layer(deconv1_2,[3,3,512,512],shape_5,"deconv1_3",training_state)
     #deconv1_4 = deconv_layer(deconv1_3,[3,3,512,512],shape_5,"deconv1_4",training_state)
@@ -75,7 +75,7 @@ def inference(images, labels, batch_size, training_state):
     deconv5_3 = conv_layer(deconv5_2,"deconv5_3",[3,3,512,512], training_state)
     deconv5_4 = conv_layer(deconv5_3,"deconv5_4",[3,3,512,512], training_state)
     #Second box of deconvolution layers(6)
-    deconv4_1 = up_sampling(deconv5_4,pool4_index, shape = shape_4,name="unpool_4")
+    deconv4_1 = up_sampling(deconv5_4,pool4_index, shape_4,name="unpool_4",ksize=[1, 2, 2, 1])
     #deconv2_2 = deconv_layer(deconv2_1,[3,3,512,512],shape_4,"deconv2_2",training_state)
     #deconv2_3 = deconv_layer(deconv2_2,[3,3,512,512],shape_4,"deconv2_3",training_state)
     #deconv2_4 = deconv_layer(deconv2_3,[3,3,256,512],[shape_4[0],shape_4[1],shape_4[2],256],"deconv2_4",training_state)
@@ -83,7 +83,7 @@ def inference(images, labels, batch_size, training_state):
     deconv4_3 = conv_layer(deconv4_2, "deconv4_3", [3,3,512,512], training_state)
     deconv4_4 = conv_layer(deconv4_3, "deconv4_4", [3,3,512,256], training_state)
     #Third box of deconvolution layers(9)
-    deconv3_1 = up_sampling(deconv4_4,pool3_index,shape = shape_3,name="unpool_3")
+    deconv3_1 = up_sampling(deconv4_4,pool3_index, shape_3,name="unpool_3",ksize=[1, 2, 2, 1])
     #deconv3_2 = deconv_layer(deconv3_1,[3,3,256,256],shape_3,"deconv3_2",training_state)
     #deconv3_3 = deconv_layer(deconv3_2,[3,3,256,256],shape_3,"deconv3_3",training_state)
     #deconv3_4 = deconv_layer(deconv3_3,[3,3,128,256],[shape_3[0],shape_3[1],shape_3[2],128],"deconv3_4",training_state)
@@ -91,13 +91,13 @@ def inference(images, labels, batch_size, training_state):
     deconv3_3 = conv_layer(deconv3_2,"deconv3_3", [3,3,256,256], training_state)
     deconv3_4 = conv_layer(deconv3_3, "deconv3_4", [3,3,256,128], training_state)
     #Fourth box of deconvolution layers(11)
-    deconv2_1 = up_sampling(deconv3_4,pool2_index,shape = shape_2,name="unpool_2")
+    deconv2_1 = up_sampling(deconv3_4,pool2_index, shape_2,name="unpool_2",ksize=[1, 2, 2, 1])
     #deconv4_2 = deconv_layer(deconv4_1,[3,3,128,128],shape_2,"deconv4_2",training_state)
     #deconv4_3 = deconv_layer(deconv4_2,[3,3,64,128],[shape_2[0],shape_2[1],shape_2[2],64],"deconv4_3",training_state)
     deconv2_2 = conv_layer(deconv2_1, "deconv2_2", [3,3,128,128], training_state)
     deconv2_3 = conv_layer(deconv2_2, "deconv2_3", [3,3,128,64], training_state)
     #Fifth box of deconvolution layers(13)
-    deconv1_1 = up_sampling(deconv2_3,pool1_index,shape = shape_1,name="unpool_1")
+    deconv1_1 = up_sampling(deconv2_3,pool1_index, shape_1,name="unpool_1",ksize=[1, 2, 2, 1])
     #deconv5_2 = deconv_layer(deconv5_1,[3,3,64,64],shape_1,"deconv5_2",training_state)
     #deconv5_3 = deconv_layer(deconv5_2,[3,3,11,64],[shape_1[0],shape_1[1],shape_1[2],11],"deconv5_3",training_state)
     deconv1_2 = conv_layer(deconv1_1, "deconv1_2", [3,3,64,64], training_state)
@@ -111,11 +111,6 @@ def inference(images, labels, batch_size, training_state):
         conv = tf.nn.conv2d(deconv1_3, kernel, [1, 1, 1, 1], padding='SAME')
         biases = _variable_on_cpu('biases', [NUM_CLASS], tf.constant_initializer(0.0),enc = False)
         conv_classifier = tf.nn.bias_add(conv, biases, name=scope.name)
-    
-    
-
-    
-    
     
     return conv_classifier
     #return loss, accuracy, prediction, conv_classifier
@@ -165,38 +160,68 @@ def batch_norm(bias_input, is_training, scope):
 #average, and then variable is the average for this specific batch of data. For the training part, we need to set is_training
 #to be True, but for the validation part, actually we should set it to be False!
 
-def unravel_index(indices, shape):
-    indices = tf.to_int64(tf.expand_dims(indices, 0))
-    shape = tf.to_int64(tf.expand_dims(shape, 1))
-    strides = tf.to_int64(tf.cumprod(shape, reverse=True))
-    strides_shifted = tf.to_int64(tf.cumprod(shape, exclusive=True, reverse=True))
-    return (indices % strides) // strides_shifted
-    #This function is utilized to transform the flattened maxpooling index to the original 4D tensor, and have already test
-    #it, which works brilliant!
+#def unravel_index(indices, shape):
+#    indices = tf.to_int64(tf.expand_dims(indices, 0))
+#    shape = tf.to_int64(tf.expand_dims(shape, 1))
+#    strides = tf.to_int64(tf.cumprod(shape, reverse=True))
+#    strides_shifted = tf.to_int64(tf.cumprod(shape, exclusive=True, reverse=True))
+#    return (indices % strides) // strides_shifted
+#    #This function is utilized to transform the flattened maxpooling index to the original 4D tensor, and have already test
+#    #it, which works brilliant!
+#    """
+#    indices: indices will be the output index from maxpooling, just to make sure if it's only 1D!
+#    Shape: the shape of the original data,[batch_size,height,width,Num_of_Channels]
+#    output: It's the 4D maxpooling indices!
+#    """
+#    
+#def up_sampling(max_values,max_indices,shape,name):
+#    """
+#    Inputs:
+#    max_value: the maximum value from maxpooling function, value need to be a tensor. The most important thing for
+#    value is that it needs to be reshaped to be only one column! 
+#    max_indices: the flattened position for the maximum value from maxpooling function. Also indices need to be reshaped
+#    to be two dimension. [Num_tot_values,4]. 4 is because we have 4 dimension
+#    shape: the shape of the original data, [batch_size,height,width,Num_of_Channels]
+#    Outputs:
+#    sp_dense: The sparse matrix from the up_sampling.
+#    """
+#    with tf.variable_scope(name):
+#        values_reshape = tf.reshape(max_values,[-1])
+#        indices_reshape = tf.reshape(max_indices,[-1])
+#        pooling_index_4d = tf.stack(tf.unstack(unravel_index(indices_reshape,shape), axis=0), axis=1)
+#        sp_tensor = tf.SparseTensor(pooling_index_4d, values = values_reshape, dense_shape = shape)
+#        sp_dense = tf.sparse_tensor_to_dense(sp_tensor, validate_indices=False)
+#        return sp_dense 
+
+
+def up_sampling(pool, ind, output_shape, name = None, ksize=[1, 2, 2, 1]):
+
     """
-    indices: indices will be the output index from maxpooling, just to make sure if it's only 1D!
-    Shape: the shape of the original data,[batch_size,height,width,Num_of_Channels]
-    output: It's the 4D maxpooling indices!
-    """
-    
-def up_sampling(max_values,max_indices,shape,name):
-    """
-    Inputs:
-    max_value: the maximum value from maxpooling function, value need to be a tensor. The most important thing for
-    value is that it needs to be reshaped to be only one column! 
-    max_indices: the flattened position for the maximum value from maxpooling function. Also indices need to be reshaped
-    to be two dimension. [Num_tot_values,4]. 4 is because we have 4 dimension
-    shape: the shape of the original data, [batch_size,height,width,Num_of_Channels]
-    Outputs:
-    sp_dense: The sparse matrix from the up_sampling.
+       Unpooling layer after max_pool_with_argmax.
+       Args:
+           pool:   max pooled output tensor
+           ind:      argmax indices
+           ksize:     ksize is the same as for the pool
+       Return:
+           unpool:    unpooling tensor
     """
     with tf.variable_scope(name):
-        values_reshape = tf.reshape(max_values,[-1])
-        indices_reshape = tf.reshape(max_indices,[-1])
-        pooling_index_4d = tf.stack(tf.unstack(unravel_index(indices_reshape,shape), axis=0), axis=1)
-        sp_tensor = tf.SparseTensor(pooling_index_4d, values = values_reshape, dense_shape = shape)
-        sp_dense = tf.sparse_tensor_to_dense(sp_tensor, validate_indices=False)
-        return sp_dense 
+        input_shape = pool.get_shape().as_list()
+        #output_shape = (input_shape[0], input_shape[1] * ksize[1], input_shape[2] * ksize[2], input_shape[3])
+        #output_shape = shape
+        flat_input_size = np.prod(input_shape)
+        flat_output_shape = [output_shape[0], output_shape[1] * output_shape[2] * output_shape[3]]
+
+        pool_ = tf.reshape(pool, [flat_input_size])
+        batch_range = tf.reshape(tf.range(output_shape[0], dtype=ind.dtype), shape=[input_shape[0], 1, 1, 1])
+        b = tf.ones_like(ind) * batch_range
+        b = tf.reshape(b, [flat_input_size, 1])
+        ind_ = tf.reshape(ind, [flat_input_size, 1])
+        ind_ = tf.concat([b, ind_], 1)
+
+        ret = tf.scatter_nd(ind_, pool_, shape=flat_output_shape)
+        ret = tf.reshape(ret, output_shape)
+        return ret
     
 
 
@@ -325,29 +350,6 @@ def Normal_Loss(logits,labels,number_class):
     
     return cross_entropy_mean, accuracy, tf.argmax(logits_reshape,-1)
     
-def _add_loss_summaries(total_loss):
-  """Add summaries for losses in CIFAR-10 model.
-  Generates moving average for all losses and associated summaries for
-  visualizing the performance of the network.
-  Args:
-    total_loss: Total loss from loss().
-  Returns:
-    loss_averages_op: op for generating moving averages of losses.
-  """
-  # Compute the moving average of all individual losses and the total loss.
-  loss_averages = tf.train.ExponentialMovingAverage(0.9, name='avg')
-  losses = tf.get_collection('losses')
-  loss_averages_op = loss_averages.apply(losses + [total_loss])
-
-  # Attach a scalar summary to all individual losses and the total loss; do the
-  # same for the averaged version of the losses.
-  for l in losses + [total_loss]:
-    # Name each loss as '(raw)' and name the moving average version of the loss
-    # as the original loss name.
-    tf.summary.scalar(l.op.name +' (raw)', l)
-    tf.summary.scalar(l.op.name, loss_averages.average(l))
-
-  return loss_averages_op
     
 
 def train_op(total_loss):
@@ -369,16 +371,15 @@ def train_op(total_loss):
     #optimizer = tf.train.GradientDescentOptimizer(learning_rate = Learning_Rate)
     global_step = tf.Variable(0, trainable = False)
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-    #variables_train = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+
    
     with tf.control_dependencies(update_ops):
        optimizer = tf.train.AdamOptimizer(Learning_Rate)
        grads = optimizer.compute_gradients(total_loss,var_list=tf.trainable_variables())
-       #gradients,variables = zip(*grads)
-       #clipped_gradients, global_norm = (tf.clip_by_global_norm(gradients,variables))
-       #clipped_grads_and_vars = zip(clipped_gradients,variables)
-       
+      
        training_op = optimizer.apply_gradients(grads, global_step = global_step)
+       
+       
     
          
     for var in tf.trainable_variables():
@@ -388,16 +389,25 @@ def train_op(total_loss):
         if grad is not None:
             tf.summary.histogram(var.op.name+'/gradients',grad)
             
+    #so here except the last layer and convolutional layers, all the other gradients are NONE, which might be a reason why those weights are not
+    #updated
+    var = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+    grads = tf.gradients(total_loss,var)
+     
+    print(var)
+    print(grads)
 
          #training_op = optimizer.minimize(loss=total_loss, global_step=global_step,var_list = tf.trainable_variables())  
-    return training_op,global_step
+    return training_op,global_step,grads
+
+    
 
 
 def TRAINING():
     """
     As before, FLAGS including all the necessary information!
     """
-    max_steps = 500000
+    max_steps = 100
     batch_size = 5
     train_dir = "/zhome/1c/2/114196/Documents/SegNet-tensorflow/"
     image_dir = "/zhome/1c/2/114196/Documents/SegNet/CamVid/train.txt"
@@ -427,12 +437,12 @@ def TRAINING():
         images_train, labels_train = dataset_inputs(image_filename, label_filename, batch_size)
         images_val, labels_val = dataset_inputs(val_image_filename, val_label_filename, batch_size)
         
-        
-        
+
         logits = inference(images_train, labels_train, batch_size, phase_train)
         loss,accuracy,prediction = Normal_Loss(logits = logits, labels = labels_train, number_class = NUM_CLASS)
-        train,global_step = train_op(total_loss = loss)
-        
+        train,global_step,grads = train_op(total_loss = loss)
+       
+
 
         summary_op = tf.summary.merge_all()
         saver = tf.train.Saver(tf.global_variables())
@@ -455,13 +465,20 @@ def TRAINING():
                              labels_train: label_batch,
                              phase_train: True}
             
-                _, _loss, _accuracy,summary = sess.run([train, loss, accuracy,summary_op], feed_dict = feed_dict)
-                
+                _, _loss, _accuracy,gradient, summary = sess.run([train, loss, accuracy,grads,summary_op], feed_dict = feed_dict)
+                #for gra, var in grads:
+                #    gradients = sess.run([gra],feed_dict = {total_loss:_loss})
+                #    print("gradients", gradients)
+                #gradients = sess.run([gra for [gra,var] in grads], feed_dict = {total_loss: _loss})
+                #gradient = sess.run([grads],feed_dict = feed_dict)
+                print("gradients",gradient)
+         
+                #print("gradient", gradients)
                 train_loss.append(_loss)
                 train_accuracy.append(_accuracy)
                 print("Iteration {}: Train Loss{:6.3f}, Train Accu {:6.3f}".format(step,train_loss[-1],train_accuracy[-1]))
 
-                if step % 100 == 0:
+                if step % 10 == 0:
                     conv_classifier= sess.run(logits,feed_dict = feed_dict) 
                     print('per_class accuracy by logits in training time',per_class_acc(conv_classifier, label_batch,NUM_CLASS)) 
                     print(np.argmax(conv_classifier,axis = -1))
@@ -469,7 +486,7 @@ def TRAINING():
                     #per_class_acc is a function from utils 
                     train_writer.add_summary(summary,step)
                    
-                if step % 1000 == 0:
+                if step % 100 == 0:
                     print("start validating.......")
                     _val_loss = []
                     _val_acc = []
