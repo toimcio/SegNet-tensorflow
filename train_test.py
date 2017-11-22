@@ -9,20 +9,35 @@ from inference import segnet_vgg, segnet_scratch, segnet_bayes_scratch, segnet_b
 NUM_CLASS = 12 
 def Test():
     batch_size = 1
-    train_dir = "/zhome/1c/2/114196/Documents/SegNet-tensorflow/model.ckpt-19999"
+    train_dir = "/zhome/1c/2/114196/Documents/SegNet-tensorflow/model.ckpt-4000"
     test_dir = "/zhome/1c/2/114196/Documents/SegNet/CamVid/test.txt"
     image_w = 480
     image_h = 360
     image_c = 3
+    FLAG_INFER = "segnet_scratch"
     
     image_filename, label_filename = get_filename_list(test_dir)
     test_data_tensor = tf.placeholder(tf.float32, shape = [batch_size, image_h, image_w, image_c])
     test_label_tensor = tf.placeholder(tf.int64, shape = [batch_size, image_h,image_w,1])
     phase_train = tf.placeholder(tf.bool, name = 'phase_train')
     keep_prob = tf.placeholder(tf.float32,shape = None, name = 'keep_probability')
-    logits = segnet_scratch(test_data_tensor,test_label_tensor,batch_size,phase_train,keep_prob)
+    if (FLAG_INFER == "segnet_scratch"):
+        logits = segnet_scratch(test_data_tensor,test_label_tensor,batch_size,phase_train,keep_prob)
+        FLAG_BAYES = False
+    elif (FLAG_INFER == "segnet_vgg"):
+        logits = segnet_vgg(test_data_tensor,test_label_tensor,batch_size,phase_train,keep_prob)
+        FLAG_BAYES = False
+    elif (FLAG_INFER == "segnet_bayes_scratch"):
+        logits = segnet_bayes_scratch(test_data_tensor,test_label_tensor,batch_size,phase_train,keep_prob)
+        FLAG_BAYES = True
+    elif (FLAG_INFER == "segnet_bayes_vgg"):
+        logits = segnet_bayes_vgg(test_data_tensor, test_label_tensor, batch_size,phase_train,keep_prob)
+        FLAG_BAYES = True
+    else:
+        print("The model is not there YET")
+            
     loss, accuracy,prediction = Normal_Loss(logits,test_label_tensor,NUM_CLASS)
-
+    prob = tf.nn.softmax(logits,axis = -1)
     saver = tf.train.Saver()
     
     with tf.Session() as sess:
@@ -48,25 +63,30 @@ def Test():
                 logit_iter_tot = []
                 loss_iter_tot = []
                 acc_iter_tot = []
+                prob_iter_tot = []
                 for iter_step in range(30):
-                    loss_iter_step, acc_iter_step, logit_iter_step = sess.run(fetches = [loss,accuracy,logits], feed_dict = feed_dict)
+                    loss_iter_step, acc_iter_step, logit_iter_step,prob_iter_step = sess.run(fetches = [loss,accuracy,logits,prob], feed_dict = feed_dict)
                     loss_iter_tot.append(loss_iter_step)                    
                     acc_iter_tot.append(acc_iter_step)                    
                     logit_iter_tot.append(logit_iter_step)
+                    prob_iter_tot.append(prob_iter_step)
                     
                 loss_per = np.nanmean(loss_iter_tot)
                 acc_per = np.nanmean(acc_iter_tot)
                 logit = np.mean(logit_iter_tot,axis = 0)
-                variance = np.var(logit_iter_tot, axis = 0)
+                prob_mean = np.nanmean(prob_iter_tot)[0]
+                prob_variance = np.var(prob_iter_tot, axis = 0)[0]
                 #THIS TIME I DIDN'T INCLUDE TAU
-                pred = np.argmax(logit,axis = -1) #pred is the predicted label
+                pred = np.reshape(np.argmax(prob_mean,axis = -1),[-1]) #pred is the predicted label
+                
                 var_sep = [] #var_sep is the corresponding variance if this pixel choose label k
                 length_cur = 0 #length_cur represent how many pixels has been read for one images
-                for row in variance:
+                for row in np.reshape(prob_variance,[image_h*image_w,12]):
                     temp = row[pred[length_cur]]
                     length_cur += 1
                     var_sep.append(temp)
                 var_one = np.reshape(var_sep,[image_h,image_w]) #var_one is the corresponding variance in terms of the "optimal" label
+                pred = np.reshape(pred,[image_h,image_w])
                     
             loss_tot.append(loss_per)
             acc_tot.append(acc_per)
@@ -75,12 +95,8 @@ def Test():
             print("Image Index {}: TEST Loss{:6.3f}, TEST Accu {:6.3f}".format(step, loss_tot[-1], acc_tot[-1]))
             step = step + 1
             per_class_acc(logit,label_batch,NUM_CLASS)
-            hist += get_hist(logit, label_batch)
-            loss_per, acc_per, logit, pred = sess.run(fetches = fetches, feed_dict = feed_dict)
-            loss_tot.append(loss_per)
-            acc_tot.append(acc_per)
-            pred_tot.append(pred)
-               
+            hist += get_hist(logit, label_batch)            
+                        
         acc_tot = np.diag(hist).sum()/hist.sum()
         iu = np.diag(hist) / (hist.sum(1) + hist.sum(0) - np.diag(hist))
         
@@ -90,6 +106,8 @@ def Test():
         
         
         return acc_tot, pred_tot,var_tot
+        
+
         
 def Train():
     max_steps = 30001
@@ -101,9 +119,9 @@ def Train():
     image_h = 480
     image_c = 3
     FLAG_INFER = "segnet_scratch"
-    FLAG_OPT = "ADAM"
     
-    
+    #For train the bayes, the FLAG_OPT SHOULD BE SGD, BUT FOR TRAIN THE NORMAL SEGNET, THE FLAG_OPT SHOULD BE ADAM!!!
+      
     image_filename,label_filename = get_filename_list(image_dir)
     val_image_filename, val_label_filename = get_filename_list(val_dir)
     
@@ -117,12 +135,16 @@ def Train():
         
         if (FLAG_INFER == "segnet_scratch"):
             logits = segnet_scratch(images_train,labels_train,batch_size,phase_train,keep_prob)
+            FLAG_OPT = "ADAM"
         elif (FLAG_INFER == "segnet_vgg"):
             logits = segnet_vgg(images_train, labels_train, batch_size, phase_train, keep_prob)
+            FLAG_OPT = "ADAM"
         elif (FLAG_INFER == "segnet_bayes_scratch"):
             logits = segnet_bayes_scratch(images_train,labels_train,batch_size,phase_train,keep_prob)
+            FLAG_OPT = "SGD"
         elif (FLAG_INFER == "segnet_bayes_vgg"):
             logits = segnet_bayes_vgg(images_train, labels_train, batch_size, phase_train, keep_prob)
+            FLAG_OPT = "SGD"
         else:
             raise ValueError("The Model Hasn't Finished Yet") 
 
