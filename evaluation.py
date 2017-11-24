@@ -162,10 +162,10 @@ def train_op(total_loss,FLAG):
             optimizer = tf.train.AdamOptimizer(0.001)
             print("Running with Adam Optimizer with learning rate:", 0.001)
         elif (FLAG == "SGD"):
-            base_learning_rate = 0.001
+            base_learning_rate = 0.1
             learning_rate = tf.train.exponential_decay(base_learning_rate,global_step,decay_steps = 1000,decay_rate = 0.0005)
             optimizer = tf.train.GradientDescentOptimizer(learning_rate)
-            print("Running with Gradient Descent Optimizer with learning rate", 0.001)
+            print("Running with Gradient Descent Optimizer with learning rate", 0.1)
         else:
             raise ValueError("Optimizer is not recognized")
             
