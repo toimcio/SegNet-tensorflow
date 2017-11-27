@@ -6,11 +6,13 @@ This file is utilized to denote different inference method. There are four diffe
 """
 import numpy as np
 import tensorflow as tf
-from layers import conv_layer, conv_layer_enc, up_sampling, max_pool, _variable_on_cpu, _initialization,_variable_with_weight_decay
+from layers import conv_layer,conv_layer_enc, up_sampling, max_pool, _variable_on_cpu, _initialization,_variable_with_weight_decay
 
 NUM_CLASS = 12
 
-def segnet_vgg(images,labels,batch_size,training_state,keep_prob):
+
+
+def segnet_vgg(images,labels,batch_size,training_state,keep_prob,training_state_drop):
     """
     Train the archietecture by vgg parameters initialization
     images: is the input images, Training data also Test data
@@ -87,7 +89,7 @@ def segnet_vgg(images,labels,batch_size,training_state,keep_prob):
     return conv_classifier
     
 
-def segnet_scratch(images,labels,batch_size,training_state,keep_prob):
+def segnet_scratch(images,labels,batch_size,training_state,keep_prob,training_state_drop):
     """
     images: is the input images, Training data also Test data
     labels: corresponding labels for images
@@ -164,7 +166,7 @@ def segnet_scratch(images,labels,batch_size,training_state,keep_prob):
     
     
     
-def segnet_bayes_scratch(images,labels,batch_size,training_state,keep_prob):
+def segnet_bayes_scratch(images,labels,batch_size,training_state,keep_prob,training_state_drop):
     """
     images: the training and validation image
     labels: corresponding labels
@@ -194,21 +196,21 @@ def segnet_bayes_scratch(images,labels,batch_size,training_state,keep_prob):
     conv3_2 = conv_layer(conv3_1, "conv3_2",[3,3,256,256], training_state)
     conv3_3 = conv_layer(conv3_2, "conv3_3", [3,3,256,256],training_state)
     pool3,pool3_index,shape_3 = max_pool(conv3_3, 'pool3')
-    dropout1 = tf.layers.dropout(pool3, rate=(1-keep_prob), training = training_state, name = "dropout1")
+    dropout1 = tf.layers.dropout(pool3, rate=(1-keep_prob), training = training_state_drop, name = "dropout1")
 
     #Fourth box of covolution layer(10)
     conv4_1 = conv_layer(dropout1, "conv4_1", [3,3,256,512], training_state)
     conv4_2 = conv_layer(conv4_1, "conv4_2", [3,3,512,512], training_state)
     conv4_3 = conv_layer(conv4_2, "conv4_3", [3,3,512,512], training_state)
     pool4,pool4_index,shape_4 = max_pool(conv4_3, 'pool4')
-    dropout2 = tf.layers.dropout(pool4,rate = (1-keep_prob), training = training_state,name = "dropout2")
+    dropout2 = tf.layers.dropout(pool4,rate = (1-keep_prob), training = training_state_drop,name = "dropout2")
 
     #Fifth box of covolution layers(13)
     conv5_1 = conv_layer(dropout2, "conv5_1", [3,3,512,512], training_state)
     conv5_2 = conv_layer(conv5_1, "conv5_2",[3,3,512,512], training_state)
     conv5_3 = conv_layer(conv5_2, "conv5_3",[3,3,512,512], training_state)
     pool5, pool5_index,shape_5 = max_pool(conv5_3, 'pool5')
-    dropout3 = tf.layers.dropout(pool5,rate = (1-keep_prob), training = training_state,name =  "dropout3")
+    dropout3 = tf.layers.dropout(pool5,rate = (1-keep_prob), training = training_state_drop,name =  "dropout3")
   
         
     #---------------------So Now the encoder process has been Finished--------------------------------------#
@@ -219,21 +221,21 @@ def segnet_bayes_scratch(images,labels,batch_size,training_state,keep_prob):
     deconv5_2 = conv_layer(deconv5_1,"deconv5_2",[3,3,512,512], training_state)
     deconv5_3 = conv_layer(deconv5_2,"deconv5_3",[3,3,512,512], training_state)
     deconv5_4 = conv_layer(deconv5_3,"deconv5_4",[3,3,512,512], training_state)
-    dropout4 = tf.layers.dropout(deconv5_4, rate = (1-keep_prob),training = training_state, name = "dropout4")
+    dropout4 = tf.layers.dropout(deconv5_4, rate = (1-keep_prob),training = training_state_drop, name = "dropout4")
 
     #Second box of deconvolution layers(6)
     deconv4_1 = up_sampling(dropout4,pool4_index, shape_4,name="unpool_4",ksize=[1, 2, 2, 1])
     deconv4_2 = conv_layer(deconv4_1,"deconv4_2", [3,3,512,512], training_state)
     deconv4_3 = conv_layer(deconv4_2, "deconv4_3", [3,3,512,512], training_state)
     deconv4_4 = conv_layer(deconv4_3, "deconv4_4", [3,3,512,256], training_state)
-    dropout5 = tf.layers.dropout(deconv4_4,rate = (1-keep_prob), training = training_state,name =  "dropout5")
+    dropout5 = tf.layers.dropout(deconv4_4,rate = (1-keep_prob), training = training_state_drop,name =  "dropout5")
 
     #Third box of deconvolution layers(9)
     deconv3_1 = up_sampling(dropout5,pool3_index, shape_3,name="unpool_3",ksize=[1, 2, 2, 1])
     deconv3_2 = conv_layer(deconv3_1,"deconv3_2", [3,3,256,256], training_state)
     deconv3_3 = conv_layer(deconv3_2,"deconv3_3", [3,3,256,256], training_state)
     deconv3_4 = conv_layer(deconv3_3, "deconv3_4", [3,3,256,128], training_state)
-    dropout6 = tf.layers.dropout(deconv3_4,rate =(1-keep_prob),training = training_state,name =  "dropout6")
+    dropout6 = tf.layers.dropout(deconv3_4,rate =(1-keep_prob),training = training_state_drop,name =  "dropout6")
 
     #Fourth box of deconvolution layers(11)
     deconv2_1 = up_sampling(dropout6,pool2_index, shape_2,name="unpool_2",ksize=[1, 2, 2, 1])
@@ -253,7 +255,7 @@ def segnet_bayes_scratch(images,labels,batch_size,training_state,keep_prob):
     return conv_classifier
     
     
-def segnet_bayes_vgg(images,labels,batch_size,training_state,keep_prob):
+def segnet_bayes_vgg(images,labels,batch_size,training_state,keep_prob,training_state_drop):
     """
     images: the training and validation image
     labels: corresponding labels
@@ -283,21 +285,21 @@ def segnet_bayes_vgg(images,labels,batch_size,training_state,keep_prob):
     conv3_2 = conv_layer_enc(conv3_1, "conv3_2",[3,3,256,256], training_state)
     conv3_3 = conv_layer_enc(conv3_2, "conv3_3", [3,3,256,256],training_state)
     pool3,pool3_index,shape_3 = max_pool(conv3_3, 'pool3')
-    dropout1 = tf.layers.dropout(pool3, rate=(1-keep_prob), training = training_state, name = "dropout1")
+    dropout1 = tf.layers.dropout(pool3, rate=(1-keep_prob), training = training_state_drop, name = "dropout1")
 
     #Fourth box of covolution layer(10)
     conv4_1 = conv_layer_enc(dropout1, "conv4_1", [3,3,256,512], training_state)
     conv4_2 = conv_layer_enc(conv4_1, "conv4_2", [3,3,512,512], training_state)
     conv4_3 = conv_layer_enc(conv4_2, "conv4_3", [3,3,512,512], training_state)
     pool4,pool4_index,shape_4 = max_pool(conv4_3, 'pool4')
-    dropout2 = tf.layers.dropout(pool4,rate = (1-keep_prob), training = training_state,name = "dropout2")
+    dropout2 = tf.layers.dropout(pool4,rate = (1-keep_prob), training = training_state_drop,name = "dropout2")
 
     #Fifth box of covolution layers(13)
     conv5_1 = conv_layer_enc(dropout2, "conv5_1", [3,3,512,512], training_state)
     conv5_2 = conv_layer_enc(conv5_1, "conv5_2",[3,3,512,512], training_state)
     conv5_3 = conv_layer_enc(conv5_2, "conv5_3",[3,3,512,512], training_state)
     pool5, pool5_index,shape_5 = max_pool(conv5_3, 'pool5')
-    dropout3 = tf.layers.dropout(pool5,rate = (1-keep_prob), training = training_state,name =  "dropout3")
+    dropout3 = tf.layers.dropout(pool5,rate = (1-keep_prob), training = training_state_drop,name =  "dropout3")
   
         
     #---------------------So Now the encoder process has been Finished--------------------------------------#
@@ -308,21 +310,21 @@ def segnet_bayes_vgg(images,labels,batch_size,training_state,keep_prob):
     deconv5_2 = conv_layer(deconv5_1,"deconv5_2",[3,3,512,512], training_state)
     deconv5_3 = conv_layer(deconv5_2,"deconv5_3",[3,3,512,512], training_state)
     deconv5_4 = conv_layer(deconv5_3,"deconv5_4",[3,3,512,512], training_state)
-    dropout4 = tf.layers.dropout(deconv5_4, rate = (1-keep_prob),training = training_state, name = "dropout4")
+    dropout4 = tf.layers.dropout(deconv5_4, rate = (1-keep_prob),training = training_state_drop, name = "dropout4")
 
     #Second box of deconvolution layers(6)
     deconv4_1 = up_sampling(dropout4,pool4_index, shape_4,name="unpool_4",ksize=[1, 2, 2, 1])
     deconv4_2 = conv_layer(deconv4_1,"deconv4_2", [3,3,512,512], training_state)
     deconv4_3 = conv_layer(deconv4_2, "deconv4_3", [3,3,512,512], training_state)
     deconv4_4 = conv_layer(deconv4_3, "deconv4_4", [3,3,512,256], training_state)
-    dropout5 = tf.layers.dropout(deconv4_4,rate = (1-keep_prob), training = training_state,name =  "dropout5")
+    dropout5 = tf.layers.dropout(deconv4_4,rate = (1-keep_prob), training = training_state_drop,name =  "dropout5")
 
     #Third box of deconvolution layers(9)
     deconv3_1 = up_sampling(dropout5,pool3_index, shape_3,name="unpool_3",ksize=[1, 2, 2, 1])
     deconv3_2 = conv_layer(deconv3_1,"deconv3_2", [3,3,256,256], training_state)
     deconv3_3 = conv_layer(deconv3_2,"deconv3_3", [3,3,256,256], training_state)
     deconv3_4 = conv_layer(deconv3_3, "deconv3_4", [3,3,256,128], training_state)
-    dropout6 = tf.layers.dropout(deconv3_4,rate =(1-keep_prob),training = training_state,name =  "dropout6")
+    dropout6 = tf.layers.dropout(deconv3_4,rate =(1-keep_prob),training = training_state_drop,name =  "dropout6")
 
     #Fourth box of deconvolution layers(11)
     deconv2_1 = up_sampling(dropout6,pool2_index, shape_2,name="unpool_2",ksize=[1, 2, 2, 1])
