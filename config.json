@@ -1,13 +1,18 @@
 {
   "TRAIN_FILE": "SegNet/CamVid/train.txt",
   "VAL_FILE": "SegNet/CamVid/val.txt",
+  "TEST_FILE": "SegNet/CamVid/test.txt",
   "IMG_PREFIX": ".",
   "LABEL_PREFIX": ".",
+  "BAYES": false,
+  "OPT": "ADAM",
+  "SAVE_MODEL_DIR": "saved_models/",
   "INPUT_HEIGHT": 360,
   "INPUT_WIDTH": 480,
   "INPUT_CHANNELS": 3,
   "NUM_CLASSES": 12,
   "USE_VGG": true,
   "VGG_FILE": "vgg16.npy",
-  "TB_LOGS": "tensorboard_logs"
+  "TB_LOGS": "tensorboard_logs",
+  "BATCH_SIZE": 3
 }
