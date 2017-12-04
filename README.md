@@ -1,15 +1,15 @@
 # SegNet- tensorflow implementation
-Training loss, training accuracy, validation loss, validation accuracy, test accuracy and MoI for different models.
+Training loss, training accuracy, validation loss, validation accuracy, test accuracy and mIoU for different models.
 
 
-|     Statistics     | SegNet Scartch| SegNet Vgg | SegNet Bayes Scratch | SegNet Bayes Vgg |SegNet Bayes Vgg+MFL+WD|
+|     Statistics     | SegNet Scratch| SegNet Vgg | SegNet Bayes Scratch | SegNet Bayes Vgg |SegNet Bayes Vgg+MFB+WD|
 | ------------------ | ------------- | ---------- | -------------------- | ---------------- | --------------------- |
 | Training Loss      |    0.0205     |  0.0320    |   0.0545             |   0.068          |      0.028            |
 | Training Accuracy  |    99.19%     |  98.72%    |   97.89%             |   97.4%          |      92.5%            |
 | Validation Loss    |    0.9031     |  0.8974    |   0.5352             |   0.487          |      0.096            |
 | Validation Accuracy|    87.12%     |  87.69%    |   90.33%             |   90.8%          |      85.0%            |
 | Test Accuracy      |    81.33%     |  81.79%    |   82.69%(82.67%)(82.69%)     |   84.25%(84.04%)(84.23%)| 80.14% |
-| Test MoI           |    42.50%     |  43.77%    |   47.50%(47.50%)(47.11%)     |   47.64%(47.89%)(47.89%)| 46.76% |
+| Test mIoU          |    42.50%     |  43.77%    |   47.50%(47.50%)(47.11%)     |   47.64%(47.89%)(47.89%)| 46.76% |
 
 The second bracket is without applying dropout in test time. The third bracket is applying dropout but with using Max Vote instead of mean. 
 
@@ -26,7 +26,7 @@ Class average accuracy for test image for different model:
 | +vgg(bayes) ALL| 89.97 | 70.19   | 11.43      |89.90 | 70.09     |61.19 | 31.50      | 11.70 |61.02 | 28.70      | 21.03     |
 | +vgg(bayes) 0.5| 90.18 | 70.03   | 10.64      |90.50 | 71.26     |62.22 | 30.25      | 13.90 |59.82 | 27.09      | 17.63     |
 | +vgg(bayes) 0.5 MAXVOTE| 90.25 | 70.02   | 11.50      |90.39 | 71.20     |62.07 | 30.44      | 13.82 |59.84 | 27.89      | 19.08     |
-| +vgg(bayes) 0.5 MFL+WD| 89.09 | 65.66   | 18.08      |84.57 | 53.78     |65.86 | 26.92      | 15.92 |65.52 | 27.71      | 24.14     |
+| +vgg(bayes) 0.5 MFB+WD| 89.09 | 65.66   | 18.08      |84.57 | 53.78     |65.86 | 26.92      | 15.92 |65.52 | 27.71      | 24.14     |
 
 
 
