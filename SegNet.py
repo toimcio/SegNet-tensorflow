@@ -225,7 +225,7 @@ class SegNet:
                                  self.is_training_pl: True,
                                  self.keep_prob_pl: 0.5,
                                  self.with_dropout_pl: True,
-                                 self.batch_size_pl: self.batch_size}
+                                 self.batch_size_pl: batch_size}
 
                     _, _loss, _accuracy, summary = self.sess.run([train, loss, accuracy, summary_op],
                                                                  feed_dict=feed_dict)
@@ -254,7 +254,7 @@ class SegNet:
                                                self.is_training_pl: True,
                                                self.keep_prob_pl: 1.0,
                                                self.with_dropout_pl: False,
-                                               self.batch_size_pl: self.batch_size}
+                                               self.batch_size_pl: batch_size}
                             # since we still using mini-batch, so in the batch norm we set phase_train to be
                             # true, and because we didin't run the trainop process, so it will not update
                             # the weight!
