@@ -6,7 +6,7 @@ import numpy as np
 import random
 from layers_object import conv_layer, up_sampling, max_pool, initialization, \
     variable_with_weight_decay
-from evaluation_object import normal_loss, per_class_acc, get_hist, print_hist_summary, train_op
+from evaluation_object import cal_loss, per_class_acc, get_hist, print_hist_summary, train_op
 from inputs_object import get_filename_list, dataset_inputs, get_all_test_data
 from drawings_object import draw_plots
 
@@ -203,7 +203,7 @@ class SegNet:
                 self.images_val, self.labels_val = dataset_inputs(val_image_filename, val_label_filename, batch_size,
                                                                   self.config)
 
-            loss, accuracy, prediction = normal_loss(logits=self.logits, labels=self.labels_pl,
+            loss, accuracy, prediction = cal_loss(logits=self.logits, labels=self.labels_pl,
                                                      number_class=self.num_classes)
             train, global_step = train_op(total_loss=loss, opt=self.opt)
 
