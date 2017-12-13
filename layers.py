@@ -7,7 +7,7 @@ import numpy as np
 import tensorflow as tf
 import math
 
-vgg16_npy_path = "/zhome/1c/2/114196/Documents/SegNet-tensorflow/vgg16.npy"
+vgg16_npy_path = "vgg16.npy"
 
 
 def vgg_param_load(vgg16_npy_path): 
@@ -20,12 +20,12 @@ def vgg_param_load(vgg16_npy_path):
 vgg_param_dict = vgg_param_load(vgg16_npy_path) 
 
 def get_conv_filter(name):
-    return tf.constant(vgg_param_dict[name][0], name="filter")
+    return vgg_param_dict[name][0]
     #so here load the weight for VGG-16, which is kernel, the kernel size for different covolution layers will show in function
     #vgg_param_load
 
 def get_bias(name):
-    return tf.constant(vgg_param_dict[name][1], name="biases")
+    return vgg_param_dict[name][1]
     #here load the bias for VGG-16, the bias size will be 64,128,256,512,512, also shown in function vgg_param_load
   
 def max_pool(inputs,name):
@@ -52,7 +52,7 @@ def conv_layer_enc(bottom, name, shape, training_state):
         tf.summary.histogram(scope.name+"weight",filt)
         conv = tf.nn.conv2d(bottom, filt, [1, 1, 1, 1], padding='SAME')
         conv_biases_init = tf.constant_initializer(get_bias(scope.name))
-        conv_biases = _variable_with_weight_decay('biases',shape = [shape[3]],initializer = conv_biases_init, wd= False, enc = True)
+        conv_biases = _variable_with_weight_decay('biases_1',shape = [shape[3]],initializer = conv_biases_init, wd= False, enc = True)
         tf.summary.histogram(scope.name+"bias",conv_biases)
         bias = tf.nn.bias_add(conv, conv_biases)
         conv_out = tf.nn.relu(batch_norm(bias,training_state,scope.name))
@@ -152,7 +152,7 @@ def _variable_on_cpu(name,shape,initializer,enc):
     Variable tensor
     """
     if enc is True:
-       var = tf.get_variable(name,initializer = initializer)
+       var = tf.get_variable(name,shape,initializer = initializer)
     else:
        var = tf.get_variable(name,shape,initializer = initializer)
     return var 

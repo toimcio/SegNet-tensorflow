@@ -72,7 +72,7 @@ def batch_norm(bias_input, is_training, scope):
 #to be True, but for the validation part, actually we should set it to be False!
 
 
-def up_sampling(pool, ind, output_shape, name=None):
+def up_sampling(pool, ind, output_shape, batch_size, name=None):
     """
        Unpooling layer after max_pool_with_argmax.
        Args:
@@ -81,24 +81,22 @@ def up_sampling(pool, ind, output_shape, name=None):
            ksize:     ksize is the same as for the pool
        Return:
            unpool:    unpooling tensor
+           :param batch_size:
     """
     with tf.variable_scope(name):
-        input_shape = pool.get_shape().as_list()
-        flat_input_size = np.prod(input_shape)
-        flat_output_shape = [output_shape[0], output_shape[1] * output_shape[2] * output_shape[3]]
-        pool_ = tf.reshape(pool, [flat_input_size])
-        batch_range = tf.reshape(tf.range(output_shape[0], dtype=ind.dtype), shape=[input_shape[0], 1, 1, 1])
+        pool_ = tf.reshape(pool, [-1])
+        batch_range = tf.reshape(tf.range(batch_size, dtype=ind.dtype), [tf.shape(pool)[0], 1, 1, 1])
         b = tf.ones_like(ind) * batch_range
-        b = tf.reshape(b, [flat_input_size, 1])
-        ind_ = tf.reshape(ind, [flat_input_size, 1])
+        b = tf.reshape(b, [-1, 1])
+        ind_ = tf.reshape(ind, [-1, 1])
         ind_ = tf.concat([b, ind_], 1)
-        ret = tf.scatter_nd(ind_, pool_, shape=flat_output_shape)
+        ret = tf.scatter_nd(ind_, pool_, shape=[batch_size, output_shape[1] * output_shape[2] * output_shape[3]])
         # the reason that we use tf.scatter_nd: if we use tf.sparse_tensor_to_dense, then the gradient is None, which will cut off the network.
         # But if we use tf.scatter_nd, the gradients for all the trainable variables will be tensors, instead of None.
         # The usage for tf.scatter_nd is that: create a new tensor by applying sparse UPDATES(which is the pooling value) to individual values of slices within a
         # zero tensor of given shape (FLAT_OUTPUT_SHAPE) according to the indices (ind_). If we ues the orignal code, the only thing we need to change is: changeing
         # from tf.sparse_tensor_to_dense(sparse_tensor) to tf.sparse_add(tf.zeros((output_sahpe)),sparse_tensor) which will give us the gradients!!!
-        ret = tf.reshape(ret, output_shape)
+        ret = tf.reshape(ret, [tf.shape(pool)[0], output_shape[1], output_shape[2], output_shape[3]])
         return ret
 
 

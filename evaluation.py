@@ -168,7 +168,6 @@ def train_op(total_loss,FLAG):
             print("Running with Gradient Descent Optimizer with learning rate", 0.1)
         else:
             raise ValueError("Optimizer is not recognized")
-            
 
         grads = optimizer.compute_gradients(total_loss,var_list=tf.trainable_variables())
         training_op = optimizer.apply_gradients(grads, global_step = global_step)

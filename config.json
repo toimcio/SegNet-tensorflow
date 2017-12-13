@@ -6,7 +6,7 @@
   "LABEL_PREFIX": ".",
   "BAYES": true,
   "OPT": "ADAM",
-  "SAVE_MODEL_DIR": "./saved_models/segnet_vgg_bayes/segnet_vgg_bayes_30000/model.ckpt-30000",
+  "SAVE_MODEL_DIR": "./saved_models/segnet_vgg_bayes/segnet_vgg_bayes_30000",
   "INPUT_HEIGHT": 360,
   "INPUT_WIDTH": 480,
   "INPUT_CHANNELS": 3,
@@ -14,5 +14,5 @@
   "USE_VGG": true,
   "VGG_FILE": "vgg16.npy",
   "TB_LOGS": "tensorboard_logs",
-  "BATCH_SIZE": 1
+  "BATCH_SIZE": 3
 }

@@ -165,13 +165,13 @@ def train_op(total_loss, opt):
 
     with tf.control_dependencies(update_ops):
         if (opt == "ADAM"):
-            optimizer = tf.train.AdamOptimizer(0.001)
+            optimizer = tf.train.AdamOptimizer(0.001, epsilon=0.0001)
             print("Running with Adam Optimizer with learning rate:", 0.001)
         elif (opt == "SGD"):
-            base_learning_rate = 0.001
-            learning_rate = tf.train.exponential_decay(base_learning_rate, global_step, decay_rate=0.0005)
+            base_learning_rate = 0.1
+            learning_rate = tf.train.exponential_decay(base_learning_rate, global_step, decay_steps=1000, decay_rate=0.0005)
             optimizer = tf.train.GradientDescentOptimizer(learning_rate)
-            print("Running with Gradient Descent Optimizer with learning rate", 0.001)
+            print("Running with Gradient Descent Optimizer with learning rate", 0.1)
         else:
             raise ValueError("Optimizer is not recognized")
 
