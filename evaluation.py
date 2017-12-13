@@ -86,6 +86,66 @@ def Normal_Loss(logits,labels,number_class):
     return cross_entropy_mean, accuracy, tf.argmax(logits_reshape,-1)
     
     
+    
+def MAX_VOTE(logit,pred,prob):
+    """
+    logit: the shape should be [NUM_SAMPLES,Batch_size, image_h,image_w,NUM_CLASS]
+    pred: the shape should be[NUM_SAMPLES,NUM_PIXELS]
+    label: the real label information for each image
+    prob: the probability, the shape should be [NUM_SAMPLES,image_h,image_w,NUM_CLASS]
+    Output:
+    logit: which will feed into the Normal loss function to calculate loss and also accuracy!
+    """
+    NUM_CLASS = np.shape(logit)[-1]
+    image_h = np.shape(logit)[2]
+    image_w = np.shape(logit)[3]
+    NUM_SAMPLES = np.shape(pred)[0]
+    #transpose the prediction to be [NUM_PIXELS,NUM_SAMPLES]
+    pred_tot = np.transpose(pred)
+    prob_re = np.reshape(prob,[NUM_SAMPLES,image_h*image_w,NUM_CLASS])
+    logit_re = np.reshape(logit,[NUM_SAMPLES,image_h*image_w,NUM_CLASS])
+    prediction = []
+    logit_final = []
+    variance_final = []
+    step = 0
+    for i in pred_tot:
+        
+        value = np.bincount(i,minlength = NUM_CLASS)
+        value_max = np.argmax(value)
+        #indices = [k for k,j in enumerate(i) if j == value_max]
+        indices = np.where(i == value_max)[0]
+        prediction.append(value_max)
+        logit_final.append(np.nanmean(logit_re[indices,step,:],axis = 0))
+        variance_final.append(np.var(prob_re[indices,step,:],axis = 0))
+        step = step+1
+        
+    logit_final = np.reshape(logit_final,[1,image_h,image_w,NUM_CLASS])
+     
+    return logit_final,variance_final,prediction
+    
+    
+def var_calculate(pred,prob_variance):
+    """
+    Inputs: 
+    pred: predicted label, shape is [NUM_PIXEL,1]
+    prob_variance: the total variance for 12 classes wrt each pixel, prob_variance shape [image_h,image_w,12]
+    Output:
+    var_one: corresponding variance in terms of the "optimal" label
+    """
+        
+    image_h = 360
+    image_w = 480
+    NUM_CLASS = np.shape(prob_variance)[-1]
+    var_sep = [] #var_sep is the corresponding variance if this pixel choose label k
+    length_cur = 0 #length_cur represent how many pixels has been read for one images
+    for row in np.reshape(prob_variance,[image_h*image_w,NUM_CLASS]):
+        temp = row[pred[length_cur]]
+        length_cur += 1
+        var_sep.append(temp)
+    var_one = np.reshape(var_sep,[image_h,image_w]) #var_one is the corresponding variance in terms of the "optimal" label
+    
+    return var_one
+    
 def per_class_acc(predictions, label_tensor,num_class):
     """
     This function is copied from "Implement slightly different segnet on tensorflow"
@@ -139,7 +199,7 @@ def print_hist_summery(hist):
             acc = np.diag(hist)[ii] / float(hist.sum(1)[ii])
         print("    class # %d accuracy = %f "%(ii, acc))
         
-def train_op(total_loss,FLAG):
+def train_op(total_loss,FLAG,FLAG_DECAY,epsilon_opt):
     """
     Input:
     total_loss: The loss 
@@ -159,17 +219,32 @@ def train_op(total_loss,FLAG):
    
     with tf.control_dependencies(update_ops):
         if (FLAG == "ADAM"):
-            optimizer = tf.train.AdamOptimizer(0.001)
-            print("Running with Adam Optimizer with learning rate:", 0.001)
+            base_learning_rate = 0.001
+            if FLAG_DECAY is True:
+                learning_rate = tf.train.exponential_decay(base_learning_rate,global_step,decay_steps = 10000, decay_rate = 0.0005)
+                optimizer = tf.train.AdamOptimizer(learning_rate,epsilon = epsilon_opt)
+                print("Running with Adam Optimizer with exponential weight decay parameters:", 0.0005)
+            else:
+                optimizer = tf.train.AdamOptimizer(base_learning_rate,epsilon = epsilon_opt)
+                print("Running with Adam Optimizer without weight decay, initial leanring rate", 0.001)
+            
         elif (FLAG == "SGD"):
             base_learning_rate = 0.1
-            learning_rate = tf.train.exponential_decay(base_learning_rate,global_step,decay_steps = 1000,decay_rate = 0.0005)
+            learning_rate = tf.train.exponential_decay(base_learning_rate,global_step,decay_steps = 1000, decay_rate = 0.0005)
             optimizer = tf.train.GradientDescentOptimizer(learning_rate)
             print("Running with Gradient Descent Optimizer with learning rate", 0.1)
         else:
             raise ValueError("Optimizer is not recognized")
+            
 
         grads = optimizer.compute_gradients(total_loss,var_list=tf.trainable_variables())
         training_op = optimizer.apply_gradients(grads, global_step = global_step)
+        
+        #uncomment to make sure all the trainable variables has gradients
+        var = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+        grads = tf.gradients(total_loss,var)
+#     
+        print(var)
+        print(grads)
 
     return training_op,global_step
