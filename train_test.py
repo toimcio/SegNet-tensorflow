@@ -15,9 +15,9 @@ from inference import segnet_vgg, segnet_scratch, segnet_bayes_scratch, segnet_b
 NUM_CLASS = 12 
 def Test():
     batch_size = 1
-    train_dir = "/zhome/1c/2/114196/Documents/SegNet-tensorflow/segnet_vgg_bayes_MFL_WD_17000/model.ckpt-17000"
+    train_dir = "/zhome/1c/2/114196/Documents/SegNet-tensorflow/segnet_vgg_bayes_MFL_WD_20000/model.ckpt-20000"
     test_dir = "/zhome/1c/2/114196/Documents/SegNet/CamVid/test.txt"
-    out_path = "/zhome/1c/2/114196/Documents/SegNet-tensorflow/segnet_vgg_bayes_MFL_WD_17000/Data/"
+    out_path = "/zhome/1c/2/114196/Documents/SegNet-tensorflow/segnet_vgg_bayes_MFL_WD_20000/Data/Subset/"
     image_w = 480
     image_h = 360
     image_c = 3
@@ -25,6 +25,8 @@ def Test():
     FLAG_MAX_VOTE = False
     #FLAG_LOSS "MFL" median frequency loss, FLAG_LOSS "NL": normal loss
     FLAG_LOSS = "MFL"
+    FLAG_CLASS_SUB = True
+    #FLAG_CLASS_SUB is utilized to noticify if the test accuracy is calculated with the class index 12
     image_filename, label_filename = get_filename_list(test_dir)
     test_data_tensor = tf.placeholder(tf.float32, shape = [batch_size, image_h, image_w, image_c])
     test_label_tensor = tf.placeholder(tf.int64, shape = [batch_size, image_h,image_w,1])
@@ -61,26 +63,34 @@ def Test():
     print("Loss calculated with: ", FLAG_LOSS)
     print("If inference model is bayes, generate samples by Max Vote: ", FLAG_MAX_VOTE)
     print("ckpt files are saved to: ", train_dir)
+    print("Calculate class accuracy without using class 12:", FLAG_CLASS_SUB)
     print(" =====================================================")
     
     with tf.Session() as sess:
         saver.restore(sess, train_dir)
-        hist = np.zeros((NUM_CLASS,NUM_CLASS))
+        if FLAG_CLASS_SUB is True:
+            hist = np.zeros((NUM_CLASS-1,NUM_CLASS-1))
+        else:
+            hist = np.zeros((NUM_CLASS,NUM_CLASS))
         images = np.load("/zhome/1c/2/114196/Documents/SegNet-tensorflow/test_image.npy")
         labels = np.load("/zhome/1c/2/114196/Documents/SegNet-tensorflow/test_label.npy")
         #images, labels = get_all_test_data(image_filename,label_filename)
         #uncomment the two lines of code below to only test on specific image
         #images = np.reshape(images[-1],[1,image_h,image_w,image_c])
         #labels = np.reshape(labels[-1],[1,image_h,image_w,1])
+        #uncomment the two lines of code below to only test on worst, average and best image
+#        index_choose = [62,66,197,232]
+#        images = images[index_choose]
+#        labels = labels[index_choose]
            
         NUM_SAMPLE = []
         for i in range(30):
             NUM_SAMPLE.append(2*i+1)
-        
-        acc_final = []
-        iu_final = []
-        acc_final_global = []
-        iu_mean_final = []
+        #uncomment the code below to save the result for generating different number of samples in the bayes inference model
+#        acc_final = []
+#        iu_final = []
+#        iu_mean_final = []
+#        class_average_accuracy_total = []
         #uncomment the line below to only run for two times. 
         NUM_SAMPLE = [1,30]
         for num_sample_generate in NUM_SAMPLE:
@@ -88,7 +98,13 @@ def Test():
             acc_tot = []
             pred_tot = []
             var_tot = []
-            hist = np.zeros((NUM_CLASS,NUM_CLASS))
+            
+            if FLAG_CLASS_SUB is True:
+               hist = np.zeros((NUM_CLASS-1,NUM_CLASS-1))
+               class_average_accuracy = np.zeros((1,NUM_CLASS-1))
+            else:
+               hist = np.zeros((NUM_CLASS,NUM_CLASS))
+               class_average_accuracy = np.zeros((1,NUM_CLASS))
             step = 0
             for image_batch, label_batch in zip(images,labels):
                 image_batch = np.reshape(image_batch,[1,image_h,image_w,image_c])
@@ -117,7 +133,6 @@ def Test():
                        prob_iter_tot.append(prob_iter_step)
                        pred_iter_tot.append(np.reshape(np.argmax(prob_iter_step,axis = -1),[-1]))
                    
-                   print(np.shape(logit_iter_tot)) 
                    #uncomment the code below to predict label with max vote!------------------------------------#
                    if FLAG_MAX_VOTE is True:
                       logit,prob_variance,pred = MAX_VOTE(logit_iter_tot,pred_iter_tot,prob_iter_tot)
@@ -143,39 +158,53 @@ def Test():
 
                 print("Image Index {}: TEST Accu {:6.3f}".format(step, acc_tot[-1]))
                 step = step + 1
-                per_class_acc(logit,label_batch,NUM_CLASS)
-                hist += get_hist(logit, label_batch)            
+                if FLAG_CLASS_SUB is True:
+                    acc_class = per_class_acc(logit,label_batch,11)
+                    hist+=get_hist(logit,label_batch,Class_Sub = True)
+                    class_average_accuracy+=np.reshape(acc_class,[1,NUM_CLASS-1])
+                else:
+                    acc_class = per_class_acc(logit,label_batch,NUM_CLASS)
+                    hist+=get_hist(logit,label_batch,Class_Sub = False)
+                    class_average_accuracy+=np.reshape(acc_class,[1,NUM_CLASS])
+                
+                
+                
 
-            acc_tot_global = np.mean(acc_tot)    
+  
             acc_tot = np.diag(hist).sum()/hist.sum() #pixel-wise accuracy corrected classified label / labeled pixels
             iu = np.diag(hist) / (hist.sum(1) + hist.sum(0) - np.diag(hist)) #intersection over union= true positive / (true positive+false positive+false negative)
-                    
+            class_average = class_average_accuracy/step       
             print("Global Accuracy: ", acc_tot) 
             print("Intersection of Union(IoU): ", iu)
-            print("IoU class average accuracy: ", np.nanmean(iu))
-            
-            acc_final_global.append(acc_tot_global)
-            acc_final.append(acc_tot)
-            iu_final.append(iu)
-            iu_mean_final.append(np.nanmean(iu))
+            print("mIoU: ", np.nanmean(iu))
+            print("Class Average Accuracy over all the images", class_average)
+            #print("Class Average Accuracy",class_average_accuracy)
+            #uncomment the code below to run this for different number of samples and see the relation between global accuracy and number of samples generated in bayes test part
+
+#            acc_final.append(acc_tot)
+#            iu_final.append(iu)
+#            iu_mean_final.append(np.nanmean(iu))
+#            class_average_accuracy_total.append(np.nanmean(class_average_accuracy))
             #uncomment the code below to save the result!
             if num_sample_generate == max(NUM_SAMPLE):
                 if (FLAG_BAYES) is True:
-                    np.save(out_path + "acc_final_global",acc_final_global)
-                    np.save(out_path + "acc_final",acc_final)
-                    np.save(out_path + "iu_final",iu_final)
-                    np.save(out_path + "iu_mean_final",iu_mean_final)
-                    np.save(out_path + "var_tot",var_tot)
-                    np.save(out_path + "prob_variance",prob_variance)
-                    np.save(out_path + "pred_tot",pred_tot)
+#                    np.save(out_path + "acc_final",acc_final)
+#                    np.save(out_path + "iu_final",iu_final)
+#                    np.save(out_path + "iu_mean_final",iu_mean_final)
+#                    np.save(out_path + "var_tot",var_tot)
+#                    np.save(out_path + "prob_variance",prob_variance)
+#                    np.save(out_path + "pred_tot",pred_tot)
                     #np.save(out_path + "prob_iter_tot_max_vote",prob_iter_tot)
+                
+                    print("Total Class Average Accuracy",np.nanmean(class_average))
                     break
                 else:
-                    np.save(out_path + "acc_final_global",acc_final_global)
-                    np.save(out_path + "acc_final",acc_final)
-                    np.save(out_path + "iu_final",iu_final)
-                    np.save(out_path + "iu_mean_final",iu_mean_final)
-                    np.save(out_path + "pred_tot",pred_tot)
+#                    np.save(out_path + "acc_final",acc_final)
+#                    np.save(out_path + "iu_final",iu_final)
+#                    np.save(out_path + "iu_mean_final",iu_mean_final)
+#                    np.save(out_path + "pred_tot",pred_tot)
+                    
+                    print("Total Class Average Accuracy",np.nanmean(class_average))
                     break #here I set break, because I only want to run for num_generate equal 30
         
 
@@ -183,19 +212,23 @@ def Test():
 
         
 def Train():
-    max_steps = 20001
+    max_steps = 2001
     batch_size = 5
-    train_dir = "/zhome/1c/2/114196/Documents/SegNet-tensorflow/segnet_vgg_bayes_MFL_WD_20000/"
+    train_dir = "/zhome/1c/2/114196/Documents/SegNet-tensorflow/segnet_vgg_NL_LRD_WD_15000/"
     image_dir = "/zhome/1c/2/114196/Documents/SegNet/CamVid/train.txt"
     val_dir = "/zhome/1c/2/114196/Documents/SegNet/CamVid/val.txt"
+    ckpt_dir = "/zhome/1c/2/114196/Documents/SegNet-tensorflow/segnet_vgg_NL_LRD_WD_15000/model.ckpt-15000"
     image_w = 360
     image_h = 480
     image_c = 3
-    FLAG_INFER = "segnet_bayes_vgg"
+    FLAG_INFER = "segnet_vgg"
     FLAG_DECAY = True
     #FLAG_LOSS "MFL" median frequency loss, FLAG_LOSS "NL": normal loss
-    FLAG_LOSS = "MFL"
+    FLAG_LOSS = "NL"
     #For train the bayes, the FLAG_OPT SHOULD BE SGD, BUT FOR TRAIN THE NORMAL SEGNET, THE FLAG_OPT SHOULD BE ADAM!!!
+    #Here, since sometimes we could see the model doesn't learn enough, so we need to increase the number of iterations, this pretrained model actually stands for like segnet_vgg_bayes_17000 model, instead of vgg16 pretrained weight.
+    #The vgg16 pretrained is denoted in the inference model. 
+    FLAG_PRETRAIN = True
     #Updated: since Gradient Descend is so slow, we use Adam Optimizer instead. 
     epsilon_opt = 1e-4
     image_filename,label_filename = get_filename_list(image_dir)
@@ -213,7 +246,7 @@ def Train():
         if (FLAG_INFER == "segnet_scratch"):
             logits = segnet_scratch(images_train,labels_train,batch_size,phase_train,keep_prob,phase_train_dropout)
             FLAG_OPT = "ADAM"
-            FLAG_DECAY = False
+         
         elif (FLAG_INFER == "segnet_vgg"):
             logits = segnet_vgg(images_train, labels_train, batch_size, phase_train, keep_prob,phase_train_dropout)
             FLAG_OPT = "ADAM"
@@ -242,7 +275,12 @@ def Train():
         train,global_step = train_op(total_loss = loss, FLAG = FLAG_OPT,FLAG_DECAY = FLAG_DECAY,epsilon_opt = epsilon_opt)
       
         summary_op = tf.summary.merge_all()
-        saver = tf.train.Saver(tf.global_variables())
+        #comment this line below to use pretrained model, since sometimes the model doesn't learn enough, we need to increase the number of iterations
+        if FLAG_PRETRAIN is False:
+           saver = tf.train.Saver(tf.global_variables())
+        #uncomment this line below to use pretrained model. 
+        else:        
+           saver = tf.train.Saver()
         
         logs_path = "/zhome/1c/2/114196/Documents/SegNet-tensorflow/graph/own/bayes_vgg_decay/"
         
@@ -251,11 +289,20 @@ def Train():
         print("Loss calculated with: ", FLAG_LOSS)
         print("ckpt files are saved to: ", train_dir)
         print("Epsilon used in Adam optimizer: ", epsilon_opt)
+        print("Learning Rate Weight Decay",FLAG_DECAY)
         print("Max Steps: ", max_steps)
+        print("Use pretrained SegNet model:",FLAG_PRETRAIN)
+        print('Start from %d iterations' % int(ckpt_dir.split('-')[-1]))
         print(" =====================================================") 
         with tf.Session() as sess:
-            sess.run(tf.variables_initializer(tf.global_variables()))
-            sess.run(tf.local_variables_initializer())
+            #uncomment these two lines below to use pretrained model
+            if FLAG_PRETRAIN is False:
+               sess.run(tf.variables_initializer(tf.global_variables()))
+               sess.run(tf.local_variables_initializer())
+            else:
+               saver.restore(sess,ckpt_dir)
+        #comment the line below to train from scratch, since sometimes we can see the loss and accuracy doesn't converge enough, which means we will need to train more iterations.
+            
             coord = tf.train.Coordinator()
             threads = tf.train.start_queue_runners(coord = coord)            
         #The queue runners basic reference: https://www.tensorflow.org/versions/r0.12/how_tos/threading_and_queues
@@ -263,6 +310,7 @@ def Train():
             val_loss, val_acc = [],[]
             train_writer = tf.summary.FileWriter(logs_path, sess.graph)
             for step in range(max_steps):
+               
                 image_batch, label_batch = sess.run([images_tr,labels_tr])
                 feed_dict = {images_train: image_batch,
                              labels_train: label_batch,
@@ -299,7 +347,7 @@ def Train():
                         _loss, _acc, _val_pred = sess.run(fetches_valid, feed_dict_valid)
                         _val_loss.append(_loss)
                         _val_acc.append(_acc)
-                        hist += get_hist(_val_pred, label_batch_val)
+                        hist += get_hist(_val_pred, label_batch_val,False)
 
                         
                     print_hist_summery(hist)
@@ -311,12 +359,21 @@ def Train():
                     step, train_loss[-1], train_accuracy[-1], val_loss[-1], val_acc[-1]))
                     
                 if step == (max_steps-1):
-                    np.save("/zhome/1c/2/114196/Documents/SegNet-tensorflow/segnet_vgg_bayes_MFL_WD_20000/Data/trainloss",train_loss)
-                    np.save("/zhome/1c/2/114196/Documents/SegNet-tensorflow/segnet_vgg_bayes_MFL_WD_20000/Data/trainacc", train_accuracy)
-                    np.save("/zhome/1c/2/114196/Documents/SegNet-tensorflow/segnet_vgg_bayes_MFL_WD_20000/Data/valloss", val_loss)
-                    np.save("/zhome/1c/2/114196/Documents/SegNet-tensorflow/segnet_vgg_bayes_MFL_WD_20000/Data/valacc", val_acc)
-                    checkpoint_path = os.path.join(train_dir,'model.ckpt')
-                    saver.save(sess,checkpoint_path,global_step = step)
+                    if FLAG_PRETRAIN is False:
+                       np.save("/zhome/1c/2/114196/Documents/SegNet-tensorflow/segnet_vgg_bayes_NL_EP_17000/Data/trainloss",train_loss)
+                       np.save("/zhome/1c/2/114196/Documents/SegNet-tensorflow/segnet_vgg_bayes_NL_EP_17000/Data/trainacc", train_accuracy)
+                       np.save("/zhome/1c/2/114196/Documents/SegNet-tensorflow/segnet_vgg_bayes_NL_EP_17000/Data/valloss", val_loss)
+                       np.save("/zhome/1c/2/114196/Documents/SegNet-tensorflow/segnet_vgg_bayes_NL_EP_17000/Data/valacc", val_acc)
+                       checkpoint_path = os.path.join(train_dir,'model.ckpt')
+                       saver.save(sess,checkpoint_path,global_step = step)
+                    else:
+#                       np.save("/zhome/1c/2/114196/Documents/SegNet-tensorflow/segnet_vgg_bayes_NL_EP_17000/Data/trainloss_pre",train_loss)
+#                       np.save("/zhome/1c/2/114196/Documents/SegNet-tensorflow/segnet_vgg_bayes_NL_EP_17000/Data/trainacc_pre", train_accuracy)
+#                       np.save("/zhome/1c/2/114196/Documents/SegNet-tensorflow/segnet_vgg_bayes_NL_EP_17000/Data/valloss_pre", val_loss)
+#                       np.save("/zhome/1c/2/114196/Documents/SegNet-tensorflow/segnet_vgg_bayes_NL_EP_17000/Data/valacc_pre", val_acc)
+                       checkpoint_path = os.path.join(train_dir,'model_pre.ckpt')
+                       saver.save(sess,checkpoint_path,global_step = step+int(ckpt_dir.split('-')[-1])) 
+                    
                     
                                         
             coord.request_stop()

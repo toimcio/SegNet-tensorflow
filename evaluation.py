@@ -160,24 +160,36 @@ def per_class_acc(predictions, label_tensor,num_class):
     print ('accuracy = %f'%np.nanmean(acc_total))
     iu = np.diag(hist) / (hist.sum(1) + hist.sum(0) - np.diag(hist))
     print ('mean IU  = %f'%np.nanmean(iu))
+    acc_class = []
     for ii in range(num_class):
         if float(hist.sum(1)[ii]) == 0:
           acc = 0.0
         else:
           acc = np.diag(hist)[ii] / float(hist.sum(1)[ii])
         print("    class # %d accuracy = %f "%(ii,acc))
+        acc_class.append(acc)
+    return acc_class
 
 def fast_hist(a, b, n):
     """
     This function is copied from "Implement slightly different segnet on tensorflow"
     """
-    k = (a >= 0) & (a < n)
+    #-----------The command below is for calculating the test accuracy without counting for Class Index 12.
+    k1 = (a >= 0) & (a < n)
+    k2 = (b >= 0) & (b < n)
+    k = k1*k2
     return np.bincount(n * a[k].astype(int) + b[k], minlength=n**2).reshape(n, n)
-def get_hist(predictions, labels):
+def get_hist(predictions, labels,Class_Sub):
     """
     This function is copied from "Implement slightly different segnet on tensorflow"
+    The new input "Class_Sub" is utilized to calculate the accuracy without counting for specific Class, eg, Class Label 12. 
+    If Class_Sub is True. Then the num_class = predictions.shape[3]
+    if Class_Sub is Flase. Then the num_class = predictions.shape[3]-1
     """
-    num_class = predictions.shape[3] #becomes 2 for aerial - correct
+    if Class_Sub is True:
+        num_class = predictions.shape[3]-1
+    else:
+        num_class = predictions.shape[3]
     batch_size = predictions.shape[0]
     hist = np.zeros((num_class, num_class))
     for i in range(batch_size):
@@ -219,14 +231,17 @@ def train_op(total_loss,FLAG,FLAG_DECAY,epsilon_opt):
    
     with tf.control_dependencies(update_ops):
         if (FLAG == "ADAM"):
-            base_learning_rate = 0.001
+            base_learning_rate = 4.2202123e-11
             if FLAG_DECAY is True:
-                learning_rate = tf.train.exponential_decay(base_learning_rate,global_step,decay_steps = 10000, decay_rate = 0.0005)
+                Decay_Rate = 0.0005
+                Decay_Steps = 7000
+                learning_rate = tf.train.exponential_decay(base_learning_rate,global_step,decay_steps = Decay_Steps, decay_rate = Decay_Rate)
                 optimizer = tf.train.AdamOptimizer(learning_rate,epsilon = epsilon_opt)
-                print("Running with Adam Optimizer with exponential weight decay parameters:", 0.0005)
+                print("Running with Adam Optimizer: Basic Learning Rate{:6.3f}, Weight Decay Rate{:6.3f}, Weight Decay Steps{:6.3f}, Epsilon{:6.3f}".format(base_learning_rate,Decay_Rate,Decay_Steps,
+                      epsilon_opt))
             else:
                 optimizer = tf.train.AdamOptimizer(base_learning_rate,epsilon = epsilon_opt)
-                print("Running with Adam Optimizer without weight decay, initial leanring rate", 0.001)
+                print("Running with Adam Optimizer without weight decay, initial leanring rate", base_learning_rate)
             
         elif (FLAG == "SGD"):
             base_learning_rate = 0.1
@@ -241,10 +256,10 @@ def train_op(total_loss,FLAG,FLAG_DECAY,epsilon_opt):
         training_op = optimizer.apply_gradients(grads, global_step = global_step)
         
         #uncomment to make sure all the trainable variables has gradients
-        var = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
-        grads = tf.gradients(total_loss,var)
-#     
-        print(var)
-        print(grads)
+#        var = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+#        grads = tf.gradients(total_loss,var)
+##     
+#        print(var)
+#        print(grads)
 
     return training_op,global_step
