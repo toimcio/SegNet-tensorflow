@@ -18,7 +18,7 @@ Visualization for the predictions based on model SegNet-Bayes-Vgg-MFL
 ![Visualization results](result/results_img.png)
 
 
-The saved model file for different models list above is saved in google drive folder: https://drive.google.com/drive/folders/1tD-4FsN6s8c45R81bjqIG_f5VCS1j-Db?usp=sharing 
+Only the saved model file for Bayesian SegNet model that list above are saved in google drive folder: https://drive.google.com/drive/folders/1tD-4FsN6s8c45R81bjqIG_f5VCS1j-Db?usp=sharing because of storage limitation. 
 
 # Usage
 Requirement: Tensorflow-GPU 1.3.0
