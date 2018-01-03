@@ -8,6 +8,7 @@ http://arxiv.org/abs/1511.00561
 Vijay Badrinarayanan, Alex Kendall and Roberto Cipolla "SegNet: A Deep Convolutional Encoder-Decoder Architecture for Image Segmentation." PAMI, 2017. 
 
 # Result for our implementatioin 
+(Image result shown below is taken from our report "Image segmentation for road scenes with Segnet and Bayesian Segnet")
 Global accuracy (G), class average accuracy (C) and mean of intersection over union (mIoU) for different model based on the CamVid dataset is shown below:
 ![Quantitative results](result/overall_accuracy.png)
 
