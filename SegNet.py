@@ -6,7 +6,7 @@ import numpy as np
 import random
 from layers_object import conv_layer, up_sampling, max_pool, initialization, \
     variable_with_weight_decay
-from evaluation_object import cal_loss, cal_loss_old, normal_loss, per_class_acc, get_hist, print_hist_summary, train_op, MAX_VOTE, var_calculate
+from evaluation_object import cal_loss, normal_loss, per_class_acc, get_hist, print_hist_summary, train_op, MAX_VOTE, var_calculate
 from inputs_object import get_filename_list, dataset_inputs, get_all_test_data
 from drawings_object import draw_plots_bayes, draw_plots_bayes_external
 from scipy import misc
@@ -293,7 +293,7 @@ class SegNet:
             saver = tf.train.Saver()
             saver.restore(sess, train_dir)
             
-            _, _, prediction = cal_loss_old(logits=self.logits,
+            _, _, prediction = cal_loss(logits=self.logits,
                                         labels=self.labels_pl)
             prob = tf.nn.softmax(self.logits,dim = -1)
             
@@ -401,7 +401,7 @@ class SegNet:
             saver = tf.train.Saver()
             saver.restore(sess, train_dir)
             
-            _, _, prediction = cal_loss_old(logits=self.logits, 
+            _, _, prediction = cal_loss(logits=self.logits, 
                                            labels=self.labels_pl)
             prob = tf.nn.softmax(self.logits,dim = -1)
             
