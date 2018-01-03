@@ -6,7 +6,7 @@
   "LABEL_PREFIX": ".",
   "BAYES": true,
   "OPT": "ADAM",
-  "SAVE_MODEL_DIR": "./saved_models/segnet_vgg_bayes/segnet_vgg_bayes_MFL_17000/model.ckpt-17000",
+  "SAVE_MODEL_DIR": "./segnet_vgg_bayes_MFL_17000/model.ckpt-17000",
   "INPUT_HEIGHT": 360,
   "INPUT_WIDTH": 480,
   "INPUT_CHANNELS": 3,
